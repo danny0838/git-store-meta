@@ -136,9 +136,6 @@ after that, a `git-store-meta --apply` must be run manually.
 Caveats:
 -------------------------------------------------------------------------------
 
-* All filenames are expected NOT TO INCLUDE CONTROL CHARS (bytes 0x00-0x1f),
-  especially HT (0x09) and LF (0x0A), or potential errors could occur.
-
 * git-store-meta cannot restore the metadata for symbolic links without the
   support of system command `chown -h`, `chgrp -h`, and `touch -h`. In those
   systems metadata of symbolic links cannot be fully restored.
