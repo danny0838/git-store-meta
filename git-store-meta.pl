@@ -212,13 +212,16 @@ sub store {
 
     # read the file list and write retrieved metadata to a temp file
     open(TEMP_FILE, ">", $temp_file) or die;
-    open(CMD, "$GIT ls-files |") or die;
-    while(<CMD>) { chomp; my $s = join("\t", get_file_metadata($_, \@fields)); print TEMP_FILE "$s\n" if $s; }
-    close(CMD);
-    if ($argv{'directory'}) {
-        open(CMD, "$GIT ls-tree -rd --name-only \$($GIT write-tree) |") or die;
+    list: {
+        local $/ = "\0";
+        open(CMD, "$GIT ls-files -z |") or die;
         while(<CMD>) { chomp; my $s = join("\t", get_file_metadata($_, \@fields)); print TEMP_FILE "$s\n" if $s; }
         close(CMD);
+        if ($argv{'directory'}) {
+            open(CMD, "$GIT ls-tree -rd --name-only -z \$($GIT write-tree) |") or die;
+            while(<CMD>) { chomp; my $s = join("\t", get_file_metadata($_, \@fields)); print TEMP_FILE "$s\n" if $s; }
+            close(CMD);
+        }
     }
     close(TEMP_FILE);
 
@@ -239,54 +242,57 @@ sub update {
 
     # append new entries to the temp file
     open(TEMP_FILE, ">>", $temp_file) or die;
-    # go through the diff list and append entries
-    open(CMD, "$GIT diff --name-status --cached |") or die;
-    while(<CMD>) {
-        chomp;
-        my ($stat, $file) = split("\t");
-        if ($stat ne "D") {
-            # a modified (including added) file
-            print TEMP_FILE "$file\0\2M\0\n";
-            # parent directories also mark as modified
-            if ($argv{'directory'}) {
-                my @parts = split("/", $file);
-                pop(@parts);
-                while ($#parts >= 0) {
-                    $file = join("/", @parts);
-                    print TEMP_FILE "$file\0\2M\0\n";
+    list: {
+        local $/ = "\0";
+        # go through the diff list and append entries
+        open(CMD, "$GIT diff --name-status --cached -z |") or die;
+        while(<CMD>) {
+            chomp;
+            my ($stat, $file) = split("\t");
+            if ($stat ne "D") {
+                # a modified (including added) file
+                print TEMP_FILE "$file\0\2M\0\n";
+                # parent directories also mark as modified
+                if ($argv{'directory'}) {
+                    my @parts = split("/", $file);
                     pop(@parts);
+                    while ($#parts >= 0) {
+                        $file = join("/", @parts);
+                        print TEMP_FILE "$file\0\2M\0\n";
+                        pop(@parts);
+                    }
+                }
+            }
+            else {
+                # a deleted file
+                print TEMP_FILE "$file\0\0D\0\n";
+                # parent directories also mark as deleted (temp and could be cancelled)
+                if ($argv{'directory'}) {
+                    my @parts = split("/", $file);
+                    pop(@parts);
+                    while ($#parts >= 0) {
+                        $file = join("/", @parts);
+                        print TEMP_FILE "$file\0\0D\0\n";
+                        pop(@parts);
+                    }
                 }
             }
         }
-        else {
-            # a deleted file
-            print TEMP_FILE "$file\0\0D\0\n";
-            # parent directories also mark as deleted (temp and could be cancelled)
-            if ($argv{'directory'}) {
-                my @parts = split("/", $file);
-                pop(@parts);
-                while ($#parts >= 0) {
-                    $file = join("/", @parts);
-                    print TEMP_FILE "$file\0\0D\0\n";
-                    pop(@parts);
-                }
-            }
-        }
-    }
-    close(CMD);
-    # add all directories as a placeholder, which prevents deletion
-    if ($argv{'directory'}) {
-        open(CMD, "$GIT ls-tree -rd --name-only \$($GIT write-tree) |") or die;
-        while(<CMD>) { chomp; print TEMP_FILE "$_\0\1H\0\n"; }
         close(CMD);
-    }
-    # update $git_store_meta_file if it's in the git working tree
-    check_meta_file: {
-        my $cmd = join(" ", ($GIT, "ls-files", "--error-unmatch", "--", escapeshellarg($git_store_meta_file), "2>&1"));
-        my $file = `$cmd`;
-        if ($? == 0) {
-            chomp($file);
-            print TEMP_FILE "$file\0\2M\0\n";
+        # add all directories as a placeholder, which prevents deletion
+        if ($argv{'directory'}) {
+            open(CMD, "$GIT ls-tree -rd --name-only -z \$($GIT write-tree) |") or die;
+            while(<CMD>) { chomp; print TEMP_FILE "$_\0\1H\0\n"; }
+            close(CMD);
+        }
+        # update $git_store_meta_file if it's in the git working tree
+        check_meta_file: {
+            my $cmd = join(" ", ($GIT, "ls-files", "--error-unmatch", "-z", "--", escapeshellarg($git_store_meta_file), "2>&1"));
+            my $file = `$cmd`;
+            if ($? == 0) {
+                chomp($file);
+                print TEMP_FILE "$file\0\2M\0\n";
+            }
         }
     }
     close(TEMP_FILE);
