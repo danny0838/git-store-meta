@@ -204,6 +204,7 @@ sub get_file_metadata {
     $mtime = timestamp_to_gmtime($mtime);
     $atime = timestamp_to_gmtime($atime);
     $mode = sprintf("%04o", $mode & 07777);
+    $mode = "0664" if $type eq "l";  # symbolic do not apply mode, but use 0664 if checked out as a plain file
     my %data = (
         "file"  => escape_filename($file),
         "type"  => $type,
@@ -395,8 +396,9 @@ sub apply {
                 next;
             }
             my $type = $data{'type'};
-            if ($type eq "f") {
-                if (! -f $file) {
+            # a symbolic in git could be checked out as a plain file, simply see them as equal
+            if ($type eq "f" || $type eq "l" ) {
+                if (! -f $file && ! -l $file) {
                     warn "warn: `$File' is not a file, skip applying metadata\n";
                     next;
                 }
@@ -407,12 +409,6 @@ sub apply {
                     next;
                 }
                 if (!$argv{'directory'}) {
-                    next;
-                }
-            }
-            elsif ($type eq "l") {
-                if (! -l $file && ! -f $file) {
-                    warn "warn: `$File' is not a symlink, skip applying metadata\n";
                     next;
                 }
             }
