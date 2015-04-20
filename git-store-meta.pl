@@ -118,6 +118,22 @@ sub escapeshellarg {
     return "'$str'";
 }
 
+# escape special chars in a filename to be safe to stay in the data file
+sub escape_filename {
+    my ($str) = @_;
+    $str =~ s!\\!\\\\!g;
+    $str =~ s!([\x00-\x1F\x7F])!'\x'.sprintf("%02X", ord($1))!eg;
+    return $str;
+}
+
+# reverse of escape_filename
+sub unescape_filename {
+    my ($str) = @_;
+    $str =~ s!\\x([0-9A-Fa-f]{2})!chr(hex($1))!eg;
+    $str =~ s!\\\\!\\!g;
+    return $str;
+}
+
 # Print the initial comment block, from first to second "# ==",
 # with "# " removed
 sub usage {
@@ -189,7 +205,7 @@ sub get_file_metadata {
     $atime = timestamp_to_gmtime($atime);
     $mode = sprintf("%04o", $mode & 07777);
     my %data = (
-        "file"  => $file,
+        "file"  => escape_filename($file),
         "type"  => $type,
         "mtime" => $mtime,
         "atime" => $atime,
@@ -248,31 +264,34 @@ sub update {
         open(CMD, "$GIT diff --name-status --cached -z |") or die;
         while(<CMD>) {
             chomp;
-            my ($stat, $file) = split("\t");
+            my $stat = $_;
+            <CMD>;
+            chomp;
+            my $file = $_;
             if ($stat ne "D") {
                 # a modified (including added) file
-                print TEMP_FILE "$file\0\2M\0\n";
+                print TEMP_FILE escape_filename($file)."\0\2M\0\n";
                 # parent directories also mark as modified
                 if ($argv{'directory'}) {
                     my @parts = split("/", $file);
                     pop(@parts);
                     while ($#parts >= 0) {
                         $file = join("/", @parts);
-                        print TEMP_FILE "$file\0\2M\0\n";
+                        print TEMP_FILE escape_filename($file)."\0\2M\0\n";
                         pop(@parts);
                     }
                 }
             }
             else {
                 # a deleted file
-                print TEMP_FILE "$file\0\0D\0\n";
+                print TEMP_FILE escape_filename($file)."\0\0D\0\n";
                 # parent directories also mark as deleted (temp and could be cancelled)
                 if ($argv{'directory'}) {
                     my @parts = split("/", $file);
                     pop(@parts);
                     while ($#parts >= 0) {
                         $file = join("/", @parts);
-                        print TEMP_FILE "$file\0\0D\0\n";
+                        print TEMP_FILE escape_filename($file)."\0\0D\0\n";
                         pop(@parts);
                     }
                 }
@@ -291,7 +310,7 @@ sub update {
             my $file = `$cmd`;
             if ($? == 0) {
                 chomp($file);
-                print TEMP_FILE "$file\0\2M\0\n";
+                print TEMP_FILE escape_filename($file)."\0\2M\0\n";
             }
         }
     }
@@ -338,7 +357,7 @@ sub update {
         if ($cur_file ne $last_file) {
             if ($cur_stat eq "M") {
                 # a modify => retrieve file metadata to print
-                my $s = join("\t", get_file_metadata($cur_file, \@fields));
+                my $s = join("\t", get_file_metadata(unescape_filename($cur_file), \@fields));
                 $cur_line = $s ? "$s\n" : "";
             }
             print $cur_line;
@@ -369,21 +388,22 @@ sub apply {
             }
 
             # check for existence and type
-            my $file = $data{'file'};
+            my $File = $data{'file'};  # escaped version, for using
+            my $file = unescape_filename($File);  # unescaped version, for printing
             if (! -e $file && ! -l $file) {  # -e tests symlink target instead of the symlink itself
-                warn "warn: `$file' does not exist, skip applying metadata\n";
+                warn "warn: `$File' does not exist, skip applying metadata\n";
                 next;
             }
             my $type = $data{'type'};
             if ($type eq "f") {
                 if (! -f $file) {
-                    warn "warn: `$file' is not a file, skip applying metadata\n";
+                    warn "warn: `$File' is not a file, skip applying metadata\n";
                     next;
                 }
             }
             elsif ($type eq "d") {
                 if (! -d $file) {
-                    warn "warn: `$file' is not a directory, skip applying metadata\n";
+                    warn "warn: `$File' is not a directory, skip applying metadata\n";
                     next;
                 }
                 if (!$argv{'directory'}) {
@@ -393,7 +413,7 @@ sub apply {
             elsif ($type eq "l") {
                 if (! -l $file) {
                     if (-f $file) {
-                        print "`$file' is being rebuilt to a symlink.\n" if $argv{'verbose'};
+                        print "`$File' is being rebuilt to a symlink.\n" if $argv{'verbose'};
                         if (!$argv{'noexec'}) {
                             my $check = 0;
                             rebuild: {
@@ -417,18 +437,18 @@ sub apply {
                                     unlink($file);
                                     rename($temp_file, $file);
                                 }
-                                warn "warn: `$file' cannot be rebuilt to a symlink\n";
+                                warn "warn: `$File' cannot be rebuilt to a symlink\n";
                             }
                         }
                     }
                     else {
-                        warn "warn: `$file' is not a symlink, skip applying metadata\n";
+                        warn "warn: `$File' is not a symlink, skip applying metadata\n";
                         next;
                     }
                 }
             }
             else {
-                warn "warn: `$file' is recorded as an unknown type, skip applying metadata\n";
+                warn "warn: `$File' is recorded as an unknown type, skip applying metadata\n";
                 next;
             }
 
@@ -438,7 +458,7 @@ sub apply {
                 if ($fields_used{'user'} && $data{'user'} ne "") {
                     my $uid = (getpwnam($data{'user'}))[2];
                     my $gid = (lstat($file))[5];
-                    print "`$file' set user to '$data{'user'}'\n" if $argv{'verbose'};
+                    print "`$File' set user to '$data{'user'}'\n" if $argv{'verbose'};
                     if ($uid) {
                         if (!$argv{'noexec'}) {
                             if (! -l $file) { $check = chown($uid, $gid, $file); }
@@ -448,7 +468,7 @@ sub apply {
                             }
                         }
                         else { $check = 1; }
-                        warn "warn: `$file' cannot set user to '$data{'user'}'\n" if !$check;
+                        warn "warn: `$File' cannot set user to '$data{'user'}'\n" if !$check;
                         last set_user if $check;
                     }
                     else {
@@ -458,7 +478,7 @@ sub apply {
                 if ($fields_used{'uid'} && $data{'uid'} ne "") {
                     my $uid = $data{'uid'};
                     my $gid = (lstat($file))[5];
-                    print "`$file' set uid to '$uid'\n" if $argv{'verbose'};
+                    print "`$File' set uid to '$uid'\n" if $argv{'verbose'};
                     if (!$argv{'noexec'}) {
                         if (! -l $file) { $check = chown($uid, $gid, $file); }
                         else {
@@ -467,14 +487,14 @@ sub apply {
                         }
                     }
                     else { $check = 1; }
-                    warn "warn: `$file' cannot set uid to '$uid'\n" if !$check;
+                    warn "warn: `$File' cannot set uid to '$uid'\n" if !$check;
                 }
             }
             set_group: {
                 if ($fields_used{'group'} && $data{'group'} ne "") {
                     my $uid = (lstat($file))[4];
                     my $gid = (getgrnam($data{'group'}))[2];
-                    print "`$file' set group to '$data{'group'}'\n" if $argv{'verbose'};
+                    print "`$File' set group to '$data{'group'}'\n" if $argv{'verbose'};
                     if ($gid) {
                         if (!$argv{'noexec'}) {
                             if (! -l $file) { $check = chown($uid, $gid, $file); }
@@ -484,7 +504,7 @@ sub apply {
                             }
                         }
                         else { $check = 1; }
-                        warn "warn: `$file' cannot set group to '$data{'group'}'\n" if !$check;
+                        warn "warn: `$File' cannot set group to '$data{'group'}'\n" if !$check;
                         last set_group if $check;
                     }
                     else {
@@ -494,7 +514,7 @@ sub apply {
                 if ($fields_used{'gid'} && $data{'gid'} ne "") {
                     my $uid = (lstat($file))[4];
                     my $gid = $data{'gid'};
-                    print "`$file' set gid to '$gid'\n" if $argv{'verbose'};
+                    print "`$File' set gid to '$gid'\n" if $argv{'verbose'};
                     if (!$argv{'noexec'}) {
                         if (! -l $file) { $check = chown($uid, $gid, $file); }
                         else {
@@ -503,19 +523,19 @@ sub apply {
                         }
                     }
                     else { $check = 1; }
-                    warn "warn: `$file' cannot set gid to '$gid'\n" if !$check;
+                    warn "warn: `$File' cannot set gid to '$gid'\n" if !$check;
                 }
             }
             if ($fields_used{'mode'} && $data{'mode'} ne "" && ! -l $file) {
                 my $mode = oct($data{'mode'}) & 07777;
-                print "`$file' set mode to '$data{'mode'}'\n" if $argv{'verbose'};
+                print "`$File' set mode to '$data{'mode'}'\n" if $argv{'verbose'};
                 $check = !$argv{'noexec'} ? chmod($mode, $file) : 1;
-                warn "warn: `$file' cannot set mode to '$data{'mode'}'\n" if !$check;
+                warn "warn: `$File' cannot set mode to '$data{'mode'}'\n" if !$check;
             }
             if ($fields_used{'mtime'} && $data{'mtime'} ne "") {
                 my $mtime = gmtime_to_timestamp($data{'mtime'});
                 my $atime = (lstat($file))[8];
-                print "`$file' set mtime to '$data{'mtime'}'\n" if $argv{'verbose'};
+                print "`$File' set mtime to '$data{'mtime'}'\n" if $argv{'verbose'};
                 if (!$argv{'noexec'}) {
                     if (! -l $file) { $check = utime($atime, $mtime, $file); }
                     else {
@@ -524,12 +544,12 @@ sub apply {
                     }
                 }
                 else { $check = 1; }
-                warn "warn: `$file' cannot set mtime to '$data{'mtime'}'\n" if !$check;
+                warn "warn: `$File' cannot set mtime to '$data{'mtime'}'\n" if !$check;
             }
             if ($fields_used{'atime'} && $data{'atime'} ne "") {
                 my $mtime = (lstat($file))[9];
                 my $atime = gmtime_to_timestamp($data{'atime'});
-                print "`$file' set atime to '$data{'atime'}'\n" if $argv{'verbose'};
+                print "`$File' set atime to '$data{'atime'}'\n" if $argv{'verbose'};
                 if (!$argv{'noexec'}) {
                     if (! -l $file) { $check = utime($atime, $mtime, $file); }
                     else {
@@ -538,7 +558,7 @@ sub apply {
                     }
                 }
                 else { $check = 1; }
-                warn "warn: `$file' cannot set atime to '$data{'atime'}'\n" if !$check;
+                warn "warn: `$File' cannot set atime to '$data{'atime'}'\n" if !$check;
             }
         }
         close(GIT_STORE_META_FILE);
