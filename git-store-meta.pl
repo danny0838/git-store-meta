@@ -411,40 +411,9 @@ sub apply {
                 }
             }
             elsif ($type eq "l") {
-                if (! -l $file) {
-                    if (-f $file) {
-                        print "`$File' is being rebuilt to a symlink.\n" if $argv{'verbose'};
-                        if (!$argv{'noexec'}) {
-                            my $check = 0;
-                            rebuild: {
-                                open(FILE, "<", $file) || last;
-                                my $target = <FILE>;
-                                defined($target) && $target ne "" || last;
-                                chomp($target);
-                                close(FILE);
-                                rename($file, $temp_file) || last;
-                                symlink($target, $file);
-                                -l $file || last;
-                                $check = 1;
-                            }
-                            if ($check) {
-                                if (-f $temp_file) {
-                                    unlink($temp_file);
-                                }
-                            }
-                            else {
-                                if (-f $temp_file) {
-                                    unlink($file);
-                                    rename($temp_file, $file);
-                                }
-                                warn "warn: `$File' cannot be rebuilt to a symlink\n";
-                            }
-                        }
-                    }
-                    else {
-                        warn "warn: `$File' is not a symlink, skip applying metadata\n";
-                        next;
-                    }
+                if (! -l $file && ! -f $file) {
+                    warn "warn: `$File' is not a symlink, skip applying metadata\n";
+                    next;
                 }
             }
             else {

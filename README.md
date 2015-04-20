@@ -19,9 +19,6 @@ Features:
 
 * Can determine whether to store, update, or apply directory metadata.
 
-* Can remember the "symbolic link" status for git-revisioned files (recorded as
-  normal files in git) and rebuild them.
-
 Dependency:
 -------------------------------------------------------------------------------
 
@@ -56,16 +53,11 @@ revision control have their metadata stored, too.
 
     .git/hooks/git-store-meta.pl --store -d
 
-Besides files and directories, symbolic links, which are recorded as normal
-files by git, also have their type recorded, and can be rebuilt in an apply.
-
 To apply (restore) the metadata recorded in the data file, run:
 
     .git/hooks/git-store-meta.pl --apply
 
-And all recorded metadata will be applied to the working copy. As above
-mentioned, each symbolic link, checked out as a normal file, will be rebuilt to
-a symbolic link pointing to the original target.
+And all recorded metadata will be applied to the working copy.
 
 Fields can be selectively applied. For example, to apply mtime only:
 
