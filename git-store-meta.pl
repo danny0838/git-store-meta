@@ -114,7 +114,7 @@ sub gmtime_to_timestamp {
 # escape a string to be safe to use as a shell script argument
 sub escapeshellarg {
     my ($str) = @_;
-    $str =~ s/'/'\\''/;
+    $str =~ s/'/'\\''/g;
     return "'$str'";
 }
 
