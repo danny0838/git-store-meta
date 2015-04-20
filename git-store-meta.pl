@@ -262,12 +262,10 @@ sub update {
         local $/ = "\0";
         # go through the diff list and append entries
         open(CMD, "$GIT diff --name-status --cached -z |") or die;
-        while(<CMD>) {
-            chomp;
-            my $stat = $_;
-            <CMD>;
-            chomp;
-            my $file = $_;
+        while(my $stat = <CMD>) {
+            chomp($stat);
+            my $file = <CMD>;
+            chomp($file);
             if ($stat ne "D") {
                 # a modified (including added) file
                 print TEMP_FILE escape_filename($file)."\0\2M\0\n";
