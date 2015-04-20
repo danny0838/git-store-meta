@@ -1,0 +1,11 @@
+#!/bin/sh
+# when running the hook, cwd is the top level of working tree
+
+sha_old=$1
+sha_new=$2
+change_br=$3
+
+# apply metadata only when the HEAD is changed
+if [ ${sha_new} != ${sha_old} ]; then
+    perl $(dirname "$0")/git-store-meta.pl --apply -d
+fi
