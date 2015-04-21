@@ -121,15 +121,15 @@ sub escapeshellarg {
 # escape special chars in a filename to be safe to stay in the data file
 sub escape_filename {
     my ($str) = @_;
-    $str =~ s!\\!\\\\!g;
-    $str =~ s!([\x00-\x1F\x7F])!'\x'.sprintf("%02X", ord($1))!eg;
+    $str =~ s!([\x00-\x1F\x5C\x7F])!'\x'.sprintf("%02X", ord($1))!eg;
     return $str;
 }
 
 # reverse of escape_filename
+# "\\" should never happen, but is supported for backward compatibility
 sub unescape_filename {
     my ($str) = @_;
-    $str =~ s!\\(?:(\\)|x([0-9A-Fa-f]{2}))!$1?"\\":chr(hex($2))!eg;
+    $str =~ s!\\(?:x([0-9A-Fa-f]{2})|\\)!$1?chr(hex($1)):"\\"!eg;
     return $str;
 }
 
