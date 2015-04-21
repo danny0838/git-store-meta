@@ -129,8 +129,7 @@ sub escape_filename {
 # reverse of escape_filename
 sub unescape_filename {
     my ($str) = @_;
-    $str =~ s!\\x([0-9A-Fa-f]{2})!chr(hex($1))!eg;
-    $str =~ s!\\\\!\\!g;
+    $str =~ s!\\(?:(\\)|x([0-9A-Fa-f]{2}))!$1?"\\":chr(hex($2))!eg;
     return $str;
 }
 
