@@ -54,7 +54,7 @@ my $GIT                      = "git";
 
 # environment variables
 my $topdir = `$GIT rev-parse --show-cdup 2>/dev/null` || undef; chomp($topdir) if defined($topdir);
-my $git_store_meta_file = ($topdir || "") . $GIT_STORE_META_FILE;
+my $git_store_meta_file = $GIT_STORE_META_FILE;
 my $git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, $GIT_STORE_META_VERSION) . "\n";
 my $script = __FILE__;
 my $temp_file = $git_store_meta_file . ".tmp" . time;
