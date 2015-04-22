@@ -34,6 +34,8 @@ Copy the `git-store-meta.pl` file to `path/to/your/repo/.git/hooks/`, change
 the working directory to the top level of git working tree, and run the
 commands.
 
+### Store
+
 To store the metadata of all git-revisioned files, run:
 
     .git/hooks/git-store-meta.pl --store -f user,group,mode,mtime,atime
@@ -48,10 +50,16 @@ a data file with these fields:
 
     <file> <type> <user> <group> <mode> <mtime> <atime>
 
-`--directory` (`-d`) option can be provided so that all directories under git
+If `-f` is not provided, git-store-meta will look in the current
+`.git_store_meta` and take its fields definition. And therefore running
+`.git/hooks/git-store-meta.pl --store` works in most usual cases.
+
+`-d` (`--directory`) option can be provided so that all directories under git
 revision control have their metadata stored, too.
 
     .git/hooks/git-store-meta.pl --store -d
+
+### Apply
 
 To apply (restore) the metadata recorded in the data file, run:
 
@@ -63,11 +71,15 @@ Fields can be selectively applied. For example, to apply mtime only:
 
     .git/hooks/git-store-meta.pl --apply -f mtime
 
-For a similar reason it'd be preferable to add `--directory` (`-d`) option so
-that directory metadata are restored if they have been stored.
+For a similar reason it'd be preferable to add `-d` option so that directory
+metadata are restored if they have been stored.
+
+    .git/hooks/git-store-meta.pl --apply -d
 
 Furthermore, `--verbose` (`-v`) option can be used to info what exactly are
 being applied.
+
+### Update
 
 After the first `--store` and commit, `--update` can be run to re-scan 
 metadata for changed files, which is much faster than to re-scan all revisioned
@@ -75,12 +87,14 @@ files. `--directory` (`-d`) can be added so that each changed file makes its
 ancestor folders re-scanned.
 
 Note that files or directories whose metadata have been changed without any
-content (or the 'x' permission) change will not be awared in this way, and a
+content (or modes git cares) change will not be awared in this way, and a
 `--store` will be required in these cases. Though, conversely, this prevents
 unintentional metadata changes from being added, and could be preferrable in
 some cases.
 
-For a detail of more available options, run:
+### Help
+
+For a more available options or a more detail description, run:
 
     .git/hooks/git-store-meta.pl --help
 
@@ -121,16 +135,16 @@ Sample code for the post-checkout hook:
 
 Of course you can adjust the options to fit your requirements.
 
-Note that since git doesn't have "post-reset" hook, and thus git-store-meta
-doesn't run after a successful `git reset --hard`. To restore file metadata
-after that, a `git-store-meta --apply` must be run manually.
+Note that since git doesn't provide a "post-reset" hook, git-store-meta doesn't
+run after a successful `git reset --hard`. To restore file metadata after that,
+an `--apply` must be run manually.
 
 Caveats:
 -------------------------------------------------------------------------------
 
 * git-store-meta cannot restore the metadata for symbolic links without the
   support of system command `chown -h`, `chgrp -h`, and `touch -h`. In those
-  systems metadata of symbolic links cannot be fully restored.
+  systems metadata of symbolic links cannot be restored.
   
 * Also, git-store-meta does not record the time more than seconds precision, as
   it's not supported widely enough, and many systems simply ignore it.
