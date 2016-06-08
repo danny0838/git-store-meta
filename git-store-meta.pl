@@ -388,8 +388,8 @@ sub apply {
             }
 
             # check for existence and type
-            my $File = $data{'file'};  # escaped version, for using
-            my $file = unescape_filename($File);  # unescaped version, for printing
+            my $File = $data{'file'};  # escaped version, for printing
+            my $file = unescape_filename($File);  # unescaped version, for using
             if (! -e $file && ! -l $file) {  # -e tests symlink target instead of the symlink itself
                 warn "warn: `$File' does not exist, skip applying metadata\n";
                 next;
