@@ -22,10 +22,11 @@ Features:
 Dependency:
 -------------------------------------------------------------------------------
 
-- *nix platform with very basic shell environment
-- perl (>=5.8 and its built-in modules)
 - git (any version)
 - sort (any version)
+- *nix platform with basic shell environment (required by Git)
+- perl >=5.8 with built-in modules (required by Git)
+- touch, chown, chgrp (optional, for applying metadata for links)
 
 Usage:
 -------------------------------------------------------------------------------
