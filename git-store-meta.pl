@@ -29,6 +29,7 @@
 #           fallback to uid)
 #   gid     group id (if group is also set, attempt to apply group first, and
 #           then fallback to gid)
+#   acl     access control lists for setfacl/getfacl
 #
 # git-store-meta 1.1.5
 # Copyright (c) 2015, Danny Lin
@@ -204,6 +205,8 @@ sub get_file_metadata {
     $atime = timestamp_to_gmtime($atime);
     $mode = sprintf("%04o", $mode & 07777);
     $mode = "0664" if $type eq "l";  # symbolic do not apply mode, but use 0664 if checked out as a plain file
+    my $cmd = join(" ", ("getfacl", "-cE", escapeshellarg("./$file")));
+    my $acl = `$cmd`; $acl =~ s/\n+$//; $acl =~ s/\n/,/g;
     my %data = (
         "file"  => escape_filename($file),
         "type"  => $type,
@@ -214,6 +217,7 @@ sub get_file_metadata {
         "gid"   => $gid,
         "user"  => $user,
         "group" => $group,
+        "acl"   => $acl,
     );
     # output formatted data
     for (my $i=0; $i<=$#fields; $i++) {
@@ -496,6 +500,15 @@ sub apply {
                 $check = !$argv{'noexec'} ? chmod($mode, $file) : 1;
                 warn "warn: `$File' cannot set mode to '$data{'mode'}'\n" if !$check;
             }
+            if ($fields_used{'acl'} && $data{'acl'} ne "") {
+                print "`$File' set acl to '$data{'acl'}'\n" if $argv{'verbose'};
+                if (!$argv{'noexec'}) {
+                    my $cmd = join(" ", ("setfacl", "-bm", escapeshellarg($data{'acl'}), escapeshellarg("./$file"), "2>&1"));
+                    `$cmd`; $check = ($? == 0);
+                }
+                else { $check = 1; }
+                warn "warn: `$File' cannot set acl to '$data{'acl'}'\n" if !$check;
+            }
             if ($fields_used{'mtime'} && $data{'mtime'} ne "") {
                 my $mtime = gmtime_to_timestamp($data{'mtime'});
                 my $atime = (lstat($file))[8];
@@ -555,6 +568,7 @@ sub main {
         "gid"   => 0,
         "user"  => 0,
         "group" => 0,
+        "acl"   => 0,
     );
     my @fields;
     my @parts;

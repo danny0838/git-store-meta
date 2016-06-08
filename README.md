@@ -26,6 +26,7 @@ Dependency:
 - sort (any version)
 - *nix platform with basic shell environment (required by Git)
 - perl >=5.8 with built-in modules (required by Git)
+- setfacl, getfacl (optional, for manipulating ACL metadata)
 - touch, chown, chgrp (optional, for applying metadata for links)
 
 Usage:
