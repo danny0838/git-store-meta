@@ -428,7 +428,7 @@ sub apply {
                             if (! -l $file) { $check = chown($uid, $gid, $file); }
                             else {
                                 my $cmd = join(" ", ("chown", "-h", escapeshellarg($data{'user'}), escapeshellarg("./$file"), "2>&1"));
-                                `$cmd`; $check = 1 if $? == 0;
+                                `$cmd`; $check = ($? == 0);
                             }
                         }
                         else { $check = 1; }
@@ -447,7 +447,7 @@ sub apply {
                         if (! -l $file) { $check = chown($uid, $gid, $file); }
                         else {
                             my $cmd = join(" ", ("chown", "-h", escapeshellarg($uid), escapeshellarg("./$file"), "2>&1"));
-                            `$cmd`; $check = 1 if $? == 0;
+                            `$cmd`; $check = ($? == 0);
                         }
                     }
                     else { $check = 1; }
@@ -464,7 +464,7 @@ sub apply {
                             if (! -l $file) { $check = chown($uid, $gid, $file); }
                             else {
                                 my $cmd = join(" ", ("chgrp", "-h", escapeshellarg($data{'group'}), escapeshellarg("./$file"), "2>&1"));
-                                `$cmd`; $check = 1 if $? == 0;
+                                `$cmd`; $check = ($? == 0);
                             }
                         }
                         else { $check = 1; }
@@ -483,7 +483,7 @@ sub apply {
                         if (! -l $file) { $check = chown($uid, $gid, $file); }
                         else {
                             my $cmd = join(" ", ("chgrp", "-h", escapeshellarg($gid), escapeshellarg("./$file"), "2>&1"));
-                            `$cmd`; $check = 1 if $? == 0;
+                            `$cmd`; $check = ($? == 0);
                         }
                     }
                     else { $check = 1; }
@@ -504,7 +504,7 @@ sub apply {
                     if (! -l $file) { $check = utime($atime, $mtime, $file); }
                     else {
                         my $cmd = join(" ", ("touch", "-hcmd", escapeshellarg($data{'mtime'}), escapeshellarg("./$file"), "2>&1"));
-                        `$cmd`; $check = 1 if $? == 0;
+                        `$cmd`; $check = ($? == 0);
                     }
                 }
                 else { $check = 1; }
@@ -518,7 +518,7 @@ sub apply {
                     if (! -l $file) { $check = utime($atime, $mtime, $file); }
                     else {
                         my $cmd = join(" ", ("touch", "-hcad", escapeshellarg($data{'atime'}), escapeshellarg("./$file"), "2>&1"));
-                        `$cmd`; $check = 1 if $? == 0;
+                        `$cmd`; $check = ($? == 0);
                     }
                 }
                 else { $check = 1; }
