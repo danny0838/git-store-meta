@@ -205,7 +205,7 @@ sub get_file_metadata {
     $atime = timestamp_to_gmtime($atime);
     $mode = sprintf("%04o", $mode & 07777);
     $mode = "0664" if $type eq "l";  # symbolic do not apply mode, but use 0664 if checked out as a plain file
-    my $cmd = join(" ", ("getfacl", "-cE", escapeshellarg("./$file")));
+    my $cmd = join(" ", ("getfacl", "-cE", escapeshellarg("./$file"), "2>/dev/null"));
     my $acl = `$cmd`; $acl =~ s/\n+$//; $acl =~ s/\n/,/g;
     my %data = (
         "file"  => escape_filename($file),
