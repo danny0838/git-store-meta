@@ -248,8 +248,13 @@ sub store {
     # output sorted entries
     print $git_store_meta_header;
     print join("\t", map {"<" . $_ . ">"} @fields) . "\n";
+
     open(CMD, "LC_COLLATE=C sort <'$temp_file' |") or die;
-    while (<CMD>) { print; }
+    while (<CMD>) {
+        unless($_ =~ /$GIT_STORE_META_FILE/) {
+            print;
+        }
+    }
     close(CMD);
 
     # clean up
@@ -332,6 +337,7 @@ sub update {
     # path, so that the original entry is overwritten.
     while ($cur_line = <CMD>) {
         chomp($cur_line);
+        if ($cur_line =~ /$GIT_STORE_META_FILE/) {next;}
         if ($cur_line =~ m!\x00[\x00-\x02]+(\w+)\x00!) {
             # has mark: a changed entry line
             $cur_stat = $1;
@@ -514,10 +520,37 @@ sub apply {
                 my $atime = (lstat($file))[8];
                 print "`$File' set mtime to '$data{'mtime'}'\n" if $argv{'verbose'};
                 if (!$argv{'noexec'}) {
-                    if (! -l $file) { $check = utime($atime, $mtime, $file); }
+                    if (! -l $file) {
+                        print "DEBUG: Not a symlink: \$atime = $atime, \$mtime = $mtime, \$file = $file\n";
+                        $check = utime($atime, $mtime, $file);
+                    }
                     else {
-                        my $cmd = join(" ", ("touch", "-hcmd", escapeshellarg($data{'mtime'}), escapeshellarg("./$file"), "2>&1"));
-                        `$cmd`; $check = ($? == 0);
+                        # THIS works. Figure out else if not work, and then make it for atime
+                        my $uname = `uname`;
+                        chomp($uname);
+                        my $newdate;
+
+                        if($uname eq "Darwin") {
+                            $newdate = "date -r $mtime +%Y%m%d%H%M.%S";
+                            print "DEBUG: OSX detected, using format: $newdate\n";
+                        } elsif($uname eq "Linux") {
+                            $newdate = "date --date='\@$mtime' '+%Y%m%d%H%M.%S'";
+                            print "DEBUG: Linux detected, using format: $newdate\n";
+                        }
+                        print "INFO: Trying: $newdate\n";
+                        $newdate = `$newdate`;
+                        chomp($newdate);
+                        my $cmd = "false";
+                        if($uname eq "Darwin") {
+                            print "OSX detected\n";
+                            $cmd = join(" ", ("touch", "-hm", $newdate, escapeshellarg("./$file"), "2>&1"));
+                            `$cmd`; $check = ($? == 0);
+                        } elsif($uname eq "Linux") {
+                            print "Linux detected\n";
+                            $cmd = join(" ", ("touch", "-hmt", $newdate, escapeshellarg("./$file"), "2>&1"));
+                            `$cmd`; $check = ($? == 0);
+                        }
+                        print "CMD: $cmd\n";
                     }
                 }
                 else { $check = 1; }
@@ -528,11 +561,37 @@ sub apply {
                 my $atime = gmtime_to_timestamp($data{'atime'});
                 print "`$File' set atime to '$data{'atime'}'\n" if $argv{'verbose'};
                 if (!$argv{'noexec'}) {
-                    if (! -l $file) { $check = utime($atime, $mtime, $file); }
-                    else {
-                        my $cmd = join(" ", ("touch", "-hcad", escapeshellarg($data{'atime'}), escapeshellarg("./$file"), "2>&1"));
-                        `$cmd`; $check = ($? == 0);
+                    if (! -l $file) {
+                        print "DEBUG: Not a symlink: \$atime = $atime, \$mtime = $mtime, \$file = $file\n";
+                        $check = utime($atime, $mtime, $file);
                     }
+                    else {
+                        my $uname = `uname`;
+                        chomp($uname);
+                        my $newdate;
+
+                        if($uname eq "Darwin") {
+                            $newdate = "date -r $atime +%Y%m%d%H%M.%S";
+                            print "DEBUG: OSX detected, using format: $newdate\n";
+                        } elsif($uname eq "Linux") {
+                            $newdate = "date --date='\@$atime' '+%Y%m%d%H%M.%S'";
+                            print "DEBUG: Linux detected, using format: $newdate\n";
+                        }
+                        print "INFO: Trying: $newdate\n";
+                        $newdate = `$newdate`;
+                        chomp($newdate);
+                        my $cmd = "false";
+                        if($uname eq "Darwin") {
+                            print "OSX detected\n";
+                            $cmd = join(" ", ("touch", "-ha", $newdate, escapeshellarg("./$file"), "2>&1"));
+                            `$cmd`; $check = ($? == 0);
+                        } elsif($uname eq "Linux") {
+                            print "Linux detected\n";
+                            $cmd = join(" ", ("touch", "-hat", $newdate, escapeshellarg("./$file"), "2>&1"));
+                            `$cmd`; $check = ($? == 0);
+                        }
+                        print "CMD: $cmd\n";
+                    }  
                 }
                 else { $check = 1; }
                 warn "warn: `$File' cannot set atime to '$data{'atime'}'\n" if !$check;
