@@ -249,7 +249,11 @@ sub store {
     print $git_store_meta_header;
     print join("\t", map {"<" . $_ . ">"} @fields) . "\n";
     open(CMD, "LC_COLLATE=C sort <'$temp_file' |") or die;
-    while (<CMD>) { print; }
+    while (<CMD>) {
+        unless($_ =~ /$GIT_STORE_META_FILE/) {
+           print;
+        }
+    }
     close(CMD);
 
     # clean up
@@ -332,6 +336,7 @@ sub update {
     # path, so that the original entry is overwritten.
     while ($cur_line = <CMD>) {
         chomp($cur_line);
+        if ($cur_line =~ /$GIT_STORE_META_FILE/) {next;}
         if ($cur_line =~ m!\x00[\x00-\x02]+(\w+)\x00!) {
             # has mark: a changed entry line
             $cur_stat = $1;
