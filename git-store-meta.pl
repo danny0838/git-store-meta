@@ -550,6 +550,7 @@ sub apply {
 sub main {
     # reset cache file if requested
     $git_store_meta_file = $argv{'target'} if ($argv{'target'} ne "");
+    $temp_file = $git_store_meta_file . ".tmp" . time;
 
     # parse header
     my ($cache_file_exist, $cache_file_accessible, $cache_header_valid, $app, $version, $cache_fields) = get_cache_header_info($git_store_meta_file);
