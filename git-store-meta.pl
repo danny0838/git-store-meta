@@ -58,7 +58,7 @@ my $topdir = `$GIT rev-parse --show-cdup 2>/dev/null` || undef; chomp($topdir) i
 my $git_store_meta_file = $GIT_STORE_META_FILE;
 my $git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, $GIT_STORE_META_VERSION) . "\n";
 my $script = __FILE__;
-my $temp_file = $git_store_meta_file . ".tmp" . time;
+my $temp_file;
 
 # parse arguments
 my %argv = (
@@ -550,6 +550,7 @@ sub apply {
 sub main {
     # reset cache file if requested
     $git_store_meta_file = $argv{'target'} if ($argv{'target'} ne "");
+    $temp_file = $git_store_meta_file . ".tmp" . time;
 
     # parse header
     my ($cache_file_exist, $cache_file_accessible, $cache_header_valid, $app, $version, $cache_fields) = get_cache_header_info($git_store_meta_file);
