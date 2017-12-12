@@ -9,6 +9,7 @@
 #   -s, --store        store the metadata for all files
 #   -u, --update       update the metadata for changed files
 #   -a, --apply        apply the metadata stored in the data file to CWD
+#   -i, --install      install pre-commit and post-checkout hooks in this repo
 #   -h, --help         print this help and exit
 #
 # Available OPTIONs are:
@@ -43,6 +44,8 @@ use strict;
 
 use Getopt::Long;
 Getopt::Long::Configure qw(gnu_getopt);
+use File::Basename;
+use File::Copy qw(copy);
 use POSIX qw( strftime );
 use Time::Local;
 
@@ -65,6 +68,7 @@ my %argv = (
     "store"      => 0,
     "update"     => 0,
     "apply"      => 0,
+    "install"    => 0,
     "help"       => 0,
     "field"      => "",
     "directory"  => 0,
@@ -76,6 +80,7 @@ GetOptions(
     "store|s",      \$argv{'store'},
     "update|u",     \$argv{'update'},
     "apply|a",      \$argv{'apply'},
+    "install|i",    \$argv{'install'},
     "help|h",       \$argv{'help'},
     "field|f=s",    \$argv{'field'},
     "directory|d",  \$argv{'directory'},
@@ -150,6 +155,69 @@ sub usage {
         }
     }
     close(GIT_STORE_META);
+}
+
+# Install hooks
+sub install_hooks {
+    # validate $topdir
+    my $gitdir = `$GIT rev-parse --git-dir 2>/dev/null` || undef; chomp($gitdir) if defined($gitdir);
+    if (!defined($gitdir)) {
+        die "error: current working directory is not in a valid git repo.\n";
+    }
+    print "git directory: `$gitdir'\n";
+
+    # Ensure the hook files don't already exist
+    foreach my $n ("pre-commit", "post-checkout") {
+        my $f = "$gitdir/hooks/$n";
+        if (-e "$f") {
+            die "error: hook file `$f' already exists.\n";
+        }
+    }
+
+    # Install the hooks
+    my $t = "$gitdir/hooks/git-store-meta.pl";
+    if (!-e $t) {
+        copy($script, $t) or die "error: failed to copy `$script' to '$t': $!\n";
+        chmod(0755, $t) == 1 or die "error: failed to set permissions on '$t': $!\n";
+        print "created `$t'\n";
+    }
+
+    $t = "$gitdir/hooks/pre-commit";
+    open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
+    print FILE <<'EOF';
+#!/bin/sh
+# when running the hook, cwd is the top level of working tree
+
+# update (or store if failed)
+perl $(dirname "$0")/git-store-meta.pl --update ||
+perl $(dirname "$0")/git-store-meta.pl --store ||
+exit 1
+
+# remember to add the updated cache file
+git add .git_store_meta
+EOF
+    close(FILE);
+    chmod(0755, $t) == 1 || die "error: failed to set permissions on '$t': $!\n";
+    print "created `$t'\n";
+
+    $t = "$gitdir/hooks/post-checkout";
+    open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
+    print FILE <<'EOF';
+#!/bin/sh
+# when running the hook, cwd is the top level of working tree
+
+sha_old=$1
+sha_new=$2
+change_br=$3
+
+# apply metadata only when the HEAD is changed
+if [ ${sha_new} != ${sha_old} ]; then
+    perl $(dirname "$0")/git-store-meta.pl --apply -d
+fi
+EOF
+    close(FILE);
+    chmod(0755, $t) == 1 || die "error: failed to set permissions on '$t': $!\n";
+    print "created `$t'\n";
 }
 
 # return the header and fields info of a file
@@ -588,12 +656,16 @@ sub main {
     my $field_info = "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
 
     # run action
-    # priority: help > update > store > action if multiple assigned
+    # priority: help > install > update > store > action if multiple assigned
     # update must go before store etc. since there's a special assign before
     my $action = "";
-    for ('help', 'update', 'store', 'apply') { if ($argv{$_}) { $action = $_; last; } }
+    for ('help', 'install', 'update', 'store', 'apply') { if ($argv{$_}) { $action = $_; last; } }
     if ($action eq "help") {
         usage();
+    }
+    elsif ($action eq "install") {
+        print "installing hooks...\n";
+        install_hooks();
     }
     elsif ($action eq "store") {
         print "storing metadata to $git_store_meta_file ...\n";
