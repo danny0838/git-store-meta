@@ -46,7 +46,7 @@ use Getopt::Long;
 Getopt::Long::Configure qw(gnu_getopt);
 use File::Basename;
 use File::Copy qw(copy);
-use POSIX qw( strftime );
+use POSIX qw(strftime);
 use Time::Local;
 
 # define constants
