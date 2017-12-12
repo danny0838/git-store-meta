@@ -33,8 +33,8 @@ Usage:
 -------------------------------------------------------------------------------
 
 Copy the `git-store-meta.pl` file to `path/to/your/repo/.git/hooks/`, change
-the working directory to the top level of git working tree, and run the
-commands.
+the working directory to the top level of the git working tree, and run one of
+the commands below.
 
 ### Store
 
@@ -94,59 +94,37 @@ content (or modes git cares) change will not be awared in this way, and a
 unintentional metadata changes from being added, and could be preferrable in
 some cases.
 
-### Help
+### Install
 
-For a more available options or a more detail description, run:
+To automatically store metadata before a commit and restore metadata after a
+checkout, run:
 
-    .git/hooks/git-store-meta.pl --help
+    .git/hooks/git-store-meta.pl --install
 
-Automation:
--------------------------------------------------------------------------------
+This will generate a `pre-commit` and a `post-checkout` hook for the current git
+repo. Of course you can modify the hooks afterwards to fit your needs better.
 
-Copy or add the `pre-commit` and/or `post-checkout` hook files to
-`path/to/your/repo/.git/hooks`, make sure they have "x" permission, and now
-file metadata will be stored during a commit and be restored during a checkout
-automatically.
-
-Sample code for the pre-commit hook:
-
-    #!/bin/sh
-    # when running the hook, cwd is the top level of working tree
-
-    # update (or store if failed)
-    perl $(dirname "$0")/git-store-meta.pl --update ||
-    perl $(dirname "$0")/git-store-meta.pl --store ||
-    exit 1
-
-    # remember to add the updated cache file
-    git add .git_store_meta
-
-Sample code for the post-checkout hook:
-
-    #!/bin/sh
-    # when running the hook, cwd is the top level of working tree
-
-    sha_old=$1
-    sha_new=$2
-    change_br=$3
-
-    # apply metadata only when the HEAD is changed
-    if [ ${sha_new} != ${sha_old} ]; then
-        perl $(dirname "$0")/git-store-meta.pl --apply -d
-    fi
-
-Of course you can adjust the options to fit your requirements.
+Note that the installation is skipped if there's already an existed `pre-commit`
+or `post-checkout` hook to avoid a dangerous overwrite. In this case you'd have
+to rename your existed hook files, run the installation, and merge the hook
+contents manually.
 
 Note that since git doesn't provide a "post-reset" hook, git-store-meta doesn't
-run after a successful `git reset --hard`. To restore file metadata after that,
-an `--apply` must be run manually.
+run after a successful `git reset --hard`. To restore file metadata after a
+reset, an `--apply` must be run manually.
+
+### Help
+
+For available options and a detail description, run:
+
+    .git/hooks/git-store-meta.pl --help
 
 Caveats:
 -------------------------------------------------------------------------------
 
 * git-store-meta cannot restore the metadata for symbolic links without the
   support of system command `chown -h`, `chgrp -h`, and `touch -h`. In those
-  systems metadata of symbolic links cannot be restored.
+  systems metadata of symbolic links are never restored.
   
-* Also, git-store-meta does not record the time more than seconds precision, as
-  it's not supported widely enough, and many systems simply ignore it.
+* git-store-meta does not record the time more than seconds precision, as it's
+  not supported widely enough and many systems simply ignore it.
