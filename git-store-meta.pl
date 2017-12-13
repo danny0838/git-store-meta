@@ -756,6 +756,9 @@ sub main {
     elsif ($action eq "apply") {
         print "applying metadata from `$git_store_meta_file' ...\n";
         # validate
+        if (!defined($topdir)) {
+            die "error: current working directory is not in a git working tree.\n";
+        }
         if (!$cache_file_exist) {
             print "`$git_store_meta_file' doesn't exist, skipped.\n";
             exit;
