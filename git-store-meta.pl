@@ -616,6 +616,27 @@ sub apply {
 # -----------------------------------------------------------------------------
 
 sub main {
+    # determine action
+    # priority: help > install > update > store > action if multiple assigned
+    # update must go before store etc. since there's a special assign before
+    my $action = "";
+    for ('help', 'install', 'update', 'store', 'apply') { if ($argv{$_}) { $action = $_; last; } }
+
+    # handle action: help, install, and unknown
+    if ($action eq "help") {
+        usage();
+        exit 0;
+    }
+    elsif ($action eq "install") {
+        print "installing hooks...\n";
+        install_hooks();
+        exit 0;
+    }
+    elsif ($action eq "") {
+        usage();
+        exit 1;
+    }
+
     # reset cache file if requested
     $git_store_meta_file = $argv{'target'} if ($argv{'target'} ne "");
     $temp_file = $git_store_meta_file . ".tmp" . time;
@@ -655,19 +676,8 @@ sub main {
     }
     my $field_info = "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
 
-    # run action
-    # priority: help > install > update > store > action if multiple assigned
-    # update must go before store etc. since there's a special assign before
-    my $action = "";
-    for ('help', 'install', 'update', 'store', 'apply') { if ($argv{$_}) { $action = $_; last; } }
-    if ($action eq "help") {
-        usage();
-    }
-    elsif ($action eq "install") {
-        print "installing hooks...\n";
-        install_hooks();
-    }
-    elsif ($action eq "store") {
+    # handle action: store, update, apply
+    if ($action eq "store") {
         print "storing metadata to $git_store_meta_file ...\n";
         # validate
         if (!defined($topdir) || $topdir) {
@@ -753,10 +763,6 @@ sub main {
         # do the apply
         print $field_info;
         apply(\%fields_used, \@cache_fields, $version);
-    }
-    else {
-        usage();
-        exit 1;
     }
 }
 
