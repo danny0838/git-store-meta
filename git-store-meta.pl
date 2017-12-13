@@ -44,8 +44,10 @@ use strict;
 
 use Getopt::Long;
 Getopt::Long::Configure qw(gnu_getopt);
+use Cwd;
 use File::Basename;
 use File::Copy qw(copy);
+use File::Spec::Functions qw(rel2abs abs2rel);
 use POSIX qw(strftime);
 use Time::Local;
 
@@ -58,9 +60,9 @@ my $GIT                      = "git";
 
 # environment variables
 my $topdir = `$GIT rev-parse --show-cdup 2>/dev/null` || undef; chomp($topdir) if defined($topdir);
-my $git_store_meta_file = $GIT_STORE_META_FILE;
+my $git_store_meta_file;
 my $git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, $GIT_STORE_META_VERSION) . "\n";
-my $script = __FILE__;
+my $script = rel2abs(__FILE__);
 my $temp_file;
 
 # parse arguments
@@ -636,8 +638,16 @@ sub main {
         exit 1;
     }
 
-    # reset cache file if requested
-    $git_store_meta_file = $argv{'target'} if ($argv{'target'} ne "");
+    # record the original CWD before change
+    my $cwd = cwd();
+
+    # cd to the top level directory of current git repo
+    if (defined($topdir) && $topdir) {
+      chdir($topdir);
+    }
+
+    # determine the path for cache and temp file
+    $git_store_meta_file = ($argv{'target'} ne "") ? rel2abs($argv{'target'}, $cwd) : rel2abs($GIT_STORE_META_FILE);
     $temp_file = $git_store_meta_file . ".tmp" . time;
 
     # parse header
@@ -679,8 +689,8 @@ sub main {
     if ($action eq "store") {
         print "storing metadata to $git_store_meta_file ...\n";
         # validate
-        if (!defined($topdir) || $topdir) {
-            die "error: please switch current working directory to the top level of a git working tree.\n";
+        if (!defined($topdir)) {
+            die "error: current working directory is not in a git working tree.\n";
         }
         # do the store
         print $field_info;
@@ -698,8 +708,8 @@ sub main {
     elsif ($action eq "update") {
         print "updating metadata to $git_store_meta_file ...\n";
         # validate
-        if (!defined($topdir) || $topdir) {
-            die "error: please switch current working directory to the top level of a git working tree.\n";
+        if (!defined($topdir)) {
+            die "error: current working directory is not in a git working tree.\n";
         }
         if (!$cache_file_exist) {
             die "error: $git_store_meta_file doesn't exist.\nRun --store to create new.\n";
