@@ -59,6 +59,7 @@ my $GIT_STORE_META_FILE      = ".git_store_meta";
 my $GIT                      = "git";
 
 # environment variables
+my $gitdir = `$GIT rev-parse --git-dir 2>/dev/null` || undef; chomp($gitdir) if defined($gitdir);
 my $topdir = `$GIT rev-parse --show-cdup 2>/dev/null` || undef; chomp($topdir) if defined($topdir);
 my $git_store_meta_file;
 my $git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, $GIT_STORE_META_VERSION) . "\n";
@@ -162,9 +163,8 @@ sub usage {
 # Install hooks
 sub install_hooks {
     # validate $topdir
-    my $gitdir = `$GIT rev-parse --git-dir 2>/dev/null` || undef; chomp($gitdir) if defined($gitdir);
     if (!defined($gitdir)) {
-        die "error: current working directory is not in a valid git repo.\n";
+        die "error: unknown git repository.\n";
     }
     print "git directory: `$gitdir'\n";
 
@@ -638,11 +638,19 @@ sub main {
         exit 1;
     }
 
+    # validate gitdir and topdir
+    if (!defined($gitdir)) {
+        die "error: unknown git repository.\n";
+    }
+    if (!defined($topdir)) {
+        die "error: current working directory is not in a git working tree.\n";
+    }
+
     # record the original CWD before change
     my $cwd = cwd();
 
     # cd to the top level directory of current git repo
-    if (defined($topdir) && $topdir) {
+    if ($topdir) {
       chdir($topdir);
     }
 
@@ -688,10 +696,6 @@ sub main {
     # handle action: store, update, apply
     if ($action eq "store") {
         print "storing metadata to `$git_store_meta_file' ...\n";
-        # validate
-        if (!defined($topdir)) {
-            die "error: current working directory is not in a git working tree.\n";
-        }
         # do the store
         print $field_info;
         if (!$argv{'noexec'}) {
@@ -708,9 +712,6 @@ sub main {
     elsif ($action eq "update") {
         print "updating metadata to `$git_store_meta_file' ...\n";
         # validate
-        if (!defined($topdir)) {
-            die "error: current working directory is not in a git working tree.\n";
-        }
         if (!$cache_file_exist) {
             die "error: `$git_store_meta_file' doesn't exist.\nRun --store to create new.\n";
         }
@@ -756,9 +757,6 @@ sub main {
     elsif ($action eq "apply") {
         print "applying metadata from `$git_store_meta_file' ...\n";
         # validate
-        if (!defined($topdir)) {
-            die "error: current working directory is not in a git working tree.\n";
-        }
         if (!$cache_file_exist) {
             print "`$git_store_meta_file' doesn't exist, skipped.\n";
             exit;
