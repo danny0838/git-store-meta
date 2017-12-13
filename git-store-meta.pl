@@ -2,23 +2,22 @@
 #
 # =============================================================================
 # Usage: git-store-meta.pl ACTION [OPTION...]
-# Store, update, or apply metadata for files revisioned by git. Switch CWD to
-# the top level of a git working tree before running this script.
+# Store, update, or apply metadata for files revisioned by Git.
 #
 # ACTION is one of:
-#   -s, --store        store the metadata for all files
+#   -s, --store        store the metadata for all files revisioned by Git
 #   -u, --update       update the metadata for changed files
-#   -a, --apply        apply the metadata stored in the data file to CWD
+#   -a, --apply        apply the stored metadata to files in the working tree
 #   -i, --install      install pre-commit and post-checkout hooks in this repo
 #   -h, --help         print this help and exit
 #
 # Available OPTIONs are:
-#   -f, --field FIELDS fields to store or apply (see below). Default is to pick
-#                      all fields in the current store file.
+#   -f, --field FIELDS fields to store or apply (see below). Defauls to pick
+#                      all fields in the current data file.
 #   -d, --directory    also store, update, or apply for directories
 #   -n, --noexec       run a test and print the output, without real action
 #   -v, --verbose      apply with verbose output
-#   -t, --target FILE  set another data file path
+#   -t, --target FILE  use the specified path as the data file
 #
 # FIELDS is a comma separated string combined with below values:
 #   mtime   last modified time
@@ -162,7 +161,7 @@ sub usage {
 
 # Install hooks
 sub install_hooks {
-    # validate $topdir
+    # validate gitdir
     if (!defined($gitdir)) {
         die "error: unknown git repository.\n";
     }
@@ -212,7 +211,7 @@ sha_old=$1
 sha_new=$2
 change_br=$3
 
-# apply metadata only when the HEAD is changed
+# apply metadata only when HEAD is changed
 if [ ${sha_new} != ${sha_old} ]; then
     $(dirname "$0")/git-store-meta.pl --apply -d
 fi

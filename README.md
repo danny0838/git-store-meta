@@ -2,12 +2,15 @@ git-store-meta
 ===============================================================================
 
 git-store-meta is a light-weight tool for file metadata storing and applying
-for git.
+for Git.
 
 Features:
 -------------------------------------------------------------------------------
 
 * Light dependency, cross-platform consistent behavior, desirable performance.
+
+* Data files are in plain text format and can be easily revisioned, diffed, or
+  manually modified as needed.
 
 * Can store the metadata of git-revisioned files into a data file.
 
@@ -27,14 +30,14 @@ Dependency:
 - *nix platform with basic shell environment (required by Git)
 - perl >=5.8 with built-in modules (required by Git)
 - setfacl, getfacl (optional, for manipulating ACL metadata)
-- touch, chown, chgrp (optional, for applying metadata for links)
+- touch, chown, chgrp (optional, for applying metadata to links)
 
 Usage:
 -------------------------------------------------------------------------------
 
 Copy the `git-store-meta.pl` file to `path/to/your/repo/.git/hooks/`, change
-the working directory to the top level of the git working tree, and run one of
-the commands below.
+the working directory to the Git working tree, and run one of the commands
+below.
 
 ### Store
 
@@ -42,8 +45,8 @@ To store the metadata of all git-revisioned files, run:
 
     .git/hooks/git-store-meta.pl --store -f user,group,mode,mtime,atime
 
-And a data file named `.git_store_meta` will be created in your repo,
-`git add` it so that the metadata of your files are recorded.
+And a data file named `.git_store_meta` (by default) will be created in your
+repo, `git add` it so that the metadata is revisioned.
 
 The `-f` (`--field`) option determines which fields are to be stored. Their
 order matters partially since it affects the order of fields in the data
@@ -52,12 +55,12 @@ a data file with these fields:
 
     <file> <type> <user> <group> <mode> <mtime> <atime>
 
-If `-f` is not provided, git-store-meta will look in the current
-`.git_store_meta` and take its fields definition. And therefore running
-`.git/hooks/git-store-meta.pl --store` works in most usual cases.
+If `-f` is not provided, git-store-meta takes the fields defined in the current
+data file, and thus running `.git/hooks/git-store-meta.pl --store` works in
+most usual cases.
 
-`-d` (`--directory`) option can be provided so that all directories under git
-revision control have their metadata stored, too.
+The `-d` (`--directory`) option can be provided so that all directories under
+Git revision control have their metadata stored, too.
 
     .git/hooks/git-store-meta.pl --store -d
 
@@ -67,7 +70,7 @@ To apply (restore) the metadata recorded in the data file, run:
 
     .git/hooks/git-store-meta.pl --apply
 
-And all recorded metadata will be applied to the working copy.
+And all recorded metadata will be applied to the working tree files.
 
 Fields can be selectively applied. For example, to apply mtime only:
 
@@ -81,18 +84,28 @@ metadata are restored if they have been stored.
 Furthermore, `--verbose` (`-v`) option can be used to info what exactly are
 being applied.
 
+An `--apply` can not be run when the working tree or index is dirty, since the
+data is in an inconsistent state in such case and the apply could be an
+irreversible mistake.
+
+For a special use case such as to apply metadata for files checked out from a
+bare repo `/path/to/foo` to a directory `/path/to/bar`, related Git environment
+variables need be explicitly provided to pass the status check, such as:
+
+    GIT_DIR=../foo GIT_WORK_TREE=. ../foo/hooks/git-store-meta.pl --apply
+
 ### Update
 
-After the first `--store` and commit, `--update` can be run to re-scan 
-metadata for changed files, which is much faster than to re-scan all revisioned
-files. `--directory` (`-d`) can be added so that each changed file makes its
-ancestor folders re-scanned.
+After a `--store` and commit, `--update` can be run to re-scan metadata only
+for changed files, which is much faster than to re-scan all revisioned files.
+`--directory` (`-d`) can be added so that each changed file makes its ancestor
+folders re-scanned.
 
 Note that files or directories whose metadata have been changed without any
-content (or modes git cares) change will not be awared in this way, and a
-`--store` will be required in these cases. Though, conversely, this prevents
-unintentional metadata changes from being added, and could be preferrable in
-some cases.
+content (or modes Git cares) change will not be awared, and a `--store` is
+required if you want to record these metadata changes. Though, conversely,
+this avoids unintentional metadata changes from being added, and could be
+preferrable in some cases.
 
 ### Install
 
@@ -101,7 +114,7 @@ checkout, run:
 
     .git/hooks/git-store-meta.pl --install
 
-This will generate a `pre-commit` and a `post-checkout` hook for the current git
+This will generate a `pre-commit` and a `post-checkout` hook for the current Git
 repo. Of course you can modify the hooks afterwards to fit your needs better.
 
 Note that the installation is skipped if there's already an existed `pre-commit`
@@ -109,7 +122,7 @@ or `post-checkout` hook to avoid a dangerous overwrite. In this case you'd have
 to rename your existed hook files, run the installation, and merge the hook
 contents manually.
 
-Note that since git doesn't provide a "post-reset" hook, git-store-meta doesn't
+Note that since Git doesn't provide a "post-reset" hook, git-store-meta doesn't
 run after a successful `git reset --hard`. To restore file metadata after a
 reset, an `--apply` must be run manually.
 
@@ -125,6 +138,6 @@ Caveats:
 * git-store-meta cannot restore the metadata for symbolic links without the
   support of system command `chown -h`, `chgrp -h`, and `touch -h`. In those
   systems metadata of symbolic links are never restored.
-  
+
 * git-store-meta does not record the time more than seconds precision, as it's
   not supported widely enough and many systems simply ignore it.
