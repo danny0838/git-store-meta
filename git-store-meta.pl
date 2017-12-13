@@ -618,7 +618,6 @@ sub apply {
 sub main {
     # determine action
     # priority: help > install > update > store > action if multiple assigned
-    # update must go before store etc. since there's a special assign before
     my $action = "";
     for ('help', 'install', 'update', 'store', 'apply') { if ($argv{$_}) { $action = $_; last; } }
 
@@ -662,7 +661,7 @@ sub main {
     );
     my @fields;
     my @parts;
-    if (!$argv{'field'} && $cache_header_valid || $argv{'update'}) {
+    if (!$argv{'field'} && $cache_header_valid || $action eq "update") {
         @parts = @cache_fields;
     }
     else {
