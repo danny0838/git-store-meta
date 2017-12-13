@@ -687,7 +687,7 @@ sub main {
 
     # handle action: store, update, apply
     if ($action eq "store") {
-        print "storing metadata to $git_store_meta_file ...\n";
+        print "storing metadata to `$git_store_meta_file' ...\n";
         # validate
         if (!defined($topdir)) {
             die "error: current working directory is not in a git working tree.\n";
@@ -706,25 +706,25 @@ sub main {
         }
     }
     elsif ($action eq "update") {
-        print "updating metadata to $git_store_meta_file ...\n";
+        print "updating metadata to `$git_store_meta_file' ...\n";
         # validate
         if (!defined($topdir)) {
             die "error: current working directory is not in a git working tree.\n";
         }
         if (!$cache_file_exist) {
-            die "error: $git_store_meta_file doesn't exist.\nRun --store to create new.\n";
+            die "error: `$git_store_meta_file' doesn't exist.\nRun --store to create new.\n";
         }
         if (!$cache_file_accessible) {
-            die "unable to access $git_store_meta_file.\n";
+            die "error: unable to access `$git_store_meta_file'.\n";
         }
         if ($app ne $GIT_STORE_META_APP) {
-            die "error: $git_store_meta_file is using another schema: $app $version\nRun --store to create new.\n";
+            die "error: `$git_store_meta_file' is using another schema: $app $version\nRun --store to create new.\n";
         }
         if (!($version =~ m!^1\.2\..+$! || $version =~ m!^1\.1\..+$!)) {
             die "error: current cache uses an unsupported schema of version: $version\n";
         }
         if (!$cache_header_valid) {
-            die "$git_store_meta_file is malformatted.\nFix it or run --store to create new.\n";
+            die "error: `$git_store_meta_file' is malformatted.\nFix it or run --store to create new.\n";
         }
         # do the update
         print $field_info;
@@ -754,20 +754,20 @@ sub main {
         my $clear = unlink($temp_file);
     }
     elsif ($action eq "apply") {
-        print "applying metadata from $git_store_meta_file ...\n";
+        print "applying metadata from `$git_store_meta_file' ...\n";
         # validate
         if (!$cache_file_exist) {
-            print "$git_store_meta_file doesn't exist, skipped.\n";
+            print "`$git_store_meta_file' doesn't exist, skipped.\n";
             exit;
         }
         if (!$cache_file_accessible) {
-            die "unable to access $git_store_meta_file.\n";
+            die "error: unable to access `$git_store_meta_file'.\n";
         }
         if ($app ne $GIT_STORE_META_APP) {
             die "error: unable to apply metadata using the schema: $app $version\n";
         }
         if (!$cache_header_valid) {
-            die "$git_store_meta_file is malformatted.\n";
+            die "error: `$git_store_meta_file' is malformatted.\n";
         }
         # do the apply
         print $field_info;
