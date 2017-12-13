@@ -763,6 +763,9 @@ sub main {
             print "`$git_store_meta_file' doesn't exist, skipped.\n";
             exit;
         }
+        if (`$GIT status --porcelain -uno -z 2>/dev/null` ne "") {
+          die "error: git working tree is not clean.\nPlease commit, stach, or revert changes before running this.\n";
+        }
         if (!$cache_file_accessible) {
             die "error: unable to access `$git_store_meta_file'.\n";
         }
