@@ -190,9 +190,9 @@ sub install_hooks {
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
-# update (or store if failed)
-perl $(dirname "$0")/git-store-meta.pl --update ||
-perl $(dirname "$0")/git-store-meta.pl --store ||
+# update (or store as fallback)
+$(dirname "$0")/git-store-meta.pl --update ||
+$(dirname "$0")/git-store-meta.pl --store ||
 exit 1
 
 # remember to add the updated cache file
@@ -214,7 +214,7 @@ change_br=$3
 
 # apply metadata only when the HEAD is changed
 if [ ${sha_new} != ${sha_old} ]; then
-    perl $(dirname "$0")/git-store-meta.pl --apply -d
+    $(dirname "$0")/git-store-meta.pl --apply -d
 fi
 EOF
     close(FILE);
