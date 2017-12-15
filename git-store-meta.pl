@@ -12,14 +12,17 @@
 #   -h, --help         print this help and exit
 #
 # Available OPTIONs are:
+#   -t, --target FILE  specify a file as the data file. Defaults to
+#                      .git_store_meta in the root of working tree.
 #   -f, --field FIELDS fields to store or apply (see below). Defauls to pick
 #                      all fields in the current data file.
 #   -d, --directory    also store, update, or apply for directories
 #   -n, --noexec       run a test and print the output, without real action
+#                      (available for: --store, --update, --apply)
 #   -v, --verbose      apply with verbose output
-#   -t, --target FILE  use the specified path as the data file
+#                      (available for: --apply)
 #
-# FIELDS is a comma separated string combined with below values:
+# FIELDS is a comma separated string composed of following values:
 #   mtime   last modified time
 #   atime   last access time
 #   mode    unix permissions
@@ -72,11 +75,11 @@ my %argv = (
     "apply"      => 0,
     "install"    => 0,
     "help"       => 0,
+    "target"     => "",
     "field"      => "",
     "directory"  => 0,
     "noexec"     => 0,
     "verbose"    => 0,
-    "target"     => "",
 );
 GetOptions(
     "store|s",      \$argv{'store'},

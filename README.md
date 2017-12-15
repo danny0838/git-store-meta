@@ -81,7 +81,7 @@ metadata are restored if they have been stored.
 
     .git/hooks/git-store-meta.pl --apply -d
 
-Furthermore, `--verbose` (`-v`) option can be used to info what exactly are
+Furthermore, the `-v` (`--verbose`) option can be used to info what exactly are
 being applied.
 
 An `--apply` can not be run when the working tree or index is dirty, since the
@@ -89,8 +89,8 @@ data is in an inconsistent state in such case and the apply could be an
 irreversible mistake.
 
 For a special use case such as to apply metadata for files checked out from a
-bare repo `/path/to/foo` to a directory `/path/to/bar`, related Git environment
-variables need be explicitly provided to pass the status check, such as:
+bare repo `/path/to/foo` to an isolated directory `/path/to/bar`, related Git
+environment variables must be explicitly provided to pass the check, such as:
 
     GIT_DIR=../foo GIT_WORK_TREE=. ../foo/hooks/git-store-meta.pl --apply
 
