@@ -86,7 +86,8 @@ being applied.
 
 An `--apply` can not be run when the working tree or index is dirty, since the
 data is in an inconsistent state in such case and the apply could be an
-irreversible mistake.
+irreversible mistake. The `--force` option can be added to skip the check and
+force the applying.
 
 For a special use case such as to apply metadata for files checked out from a
 bare repo `/path/to/foo` to an isolated directory `/path/to/bar`, related Git

@@ -21,6 +21,8 @@
 #                      (available for: --store, --update, --apply)
 #   -v, --verbose      apply with verbose output
 #                      (available for: --apply)
+#   --force            force an apply even if working tree is not clean
+#                      (available for: --apply)
 #
 # FIELDS is a comma separated string composed of following values:
 #   mtime   last modified time
@@ -78,6 +80,7 @@ my %argv = (
     "target"     => "",
     "field"      => "",
     "directory"  => 0,
+    "force"      => 0,
     "noexec"     => 0,
     "verbose"    => 0,
 );
@@ -89,6 +92,7 @@ GetOptions(
     "help|h",       \$argv{'help'},
     "field|f=s",    \$argv{'field'},
     "directory|d",  \$argv{'directory'},
+    "force",        \$argv{'force'},
     "noexec|n",     \$argv{'noexec'},
     "verbose|v",    \$argv{'verbose'},
     "target|t=s",   \$argv{'target'},
@@ -763,8 +767,8 @@ sub main {
             print "`$git_store_meta_file' doesn't exist, skipped.\n";
             exit;
         }
-        if (`$GIT status --porcelain -uno -z 2>/dev/null` ne "") {
-          die "error: git working tree is not clean.\nPlease commit, stach, or revert changes before running this.\n";
+        if (!$argv{'force'} && `$GIT status --porcelain -uno -z 2>/dev/null` ne "") {
+          die "error: git working tree is not clean.\nCommit, stach, or revert changes before running this, or use --force.\n";
         }
         if (!$cache_file_accessible) {
             die "error: unable to access `$git_store_meta_file'.\n";
