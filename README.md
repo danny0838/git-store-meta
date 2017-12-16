@@ -50,18 +50,18 @@ To store the metadata of all git-revisioned files, run:
 And a data file named `.git_store_meta` (by default) will be created in your
 repo, `git add` it so that the metadata is revisioned.
 
-The `-f` (`--field`) option determines which fields are to be stored. Their
+The `--field` (`-f`) option determines which fields are to be stored. Their
 order matters partially since it affects the order of fields in the data
 file, but it doesn't affect applying. For example the above command creates
 a data file with these fields:
 
     <file> <type> <user> <group> <mode> <mtime> <atime>
 
-If `-f` is not provided, git-store-meta takes the fields defined in the current
-data file, and thus running `.git/hooks/git-store-meta.pl --store` works in
-most usual cases.
+If `--field` is not provided, git-store-meta takes the fields defined in the
+current data file, and thus running `.git/hooks/git-store-meta.pl --store`
+works in most usual cases.
 
-The `-d` (`--directory`) option can be provided so that all directories under
+The `--directory` (`-d`) option can be provided so that all directories under
 Git revision control have their metadata stored, too.
 
     .git/hooks/git-store-meta.pl --store -d
@@ -78,12 +78,12 @@ Fields can be selectively applied. For example, to apply mtime only:
 
     .git/hooks/git-store-meta.pl --apply -f mtime
 
-For a similar reason it'd be preferable to add `-d` option so that directory
-metadata are restored if they have been stored.
+For a similar reason it'd be preferable to add `--directory` option so that
+directory metadata are restored if they have been stored.
 
     .git/hooks/git-store-meta.pl --apply -d
 
-Furthermore, the `-v` (`--verbose`) option can be used to info what exactly are
+Furthermore, the `--verbose` (`-v`) option can be used to info what exactly are
 being applied.
 
 An `--apply` can not be run when the working tree or index is dirty, since the
