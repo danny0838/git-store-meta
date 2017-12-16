@@ -12,6 +12,8 @@ Features:
 * Data files are in plain text format and can be easily revisioned, diffed, or
   manually modified as needed.
 
+* Supported metadata: mtime, atime, mode, user, uid, group, gid, acl.
+
 * Can store the metadata of git-revisioned files into a data file.
 
 * Can apply the metadata stored in the data file to the working copy.
