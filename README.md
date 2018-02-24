@@ -113,9 +113,14 @@ preferrable in some cases.
 ### Install
 
 To automatically store metadata before a commit and restore metadata after a
-checkout, run:
+checkout for files, run:
 
     .git/hooks/git-store-meta.pl --install
+
+The `--directory` (`-d`) option can be provided so that metadata of directories
+are also handled:
+
+    .git/hooks/git-store-meta.pl --install -d
 
 This will generate a `pre-commit` and a `post-checkout` hook for the current Git
 repo. Of course you can modify the hooks afterwards to fit your needs better.

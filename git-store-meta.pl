@@ -191,14 +191,15 @@ sub install_hooks {
     }
 
     $t = "$gitdir/hooks/pre-commit";
+    my $d = $argv{'directory'} ? " -d" : "";
     open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
-    print FILE <<'EOF';
+    printf FILE <<'EOF', $d, $d;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
 # update (or store as fallback)
-$(dirname "$0")/git-store-meta.pl --update ||
-$(dirname "$0")/git-store-meta.pl --store ||
+$(dirname "$0")/git-store-meta.pl --update%s ||
+$(dirname "$0")/git-store-meta.pl --store%s ||
 exit 1
 
 # remember to add the updated cache file
