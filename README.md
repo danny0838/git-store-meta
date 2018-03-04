@@ -118,7 +118,7 @@ after a checkout, run:
     .git/hooks/git-store-meta.pl --install
 
 The `--directory` (`-d`) option can be provided so that all directories under
-Git revision control have their metadata stored, too.
+Git revision control have their metadata stored, too:
 
     .git/hooks/git-store-meta.pl --install -d
 
