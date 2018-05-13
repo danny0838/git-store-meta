@@ -8,7 +8,8 @@
 #   -s, --store        store the metadata for all files revisioned by Git
 #   -u, --update       update the metadata for changed files
 #   -a, --apply        apply the stored metadata to files in the working tree
-#   -i, --install      install pre-commit and post-checkout hooks in this repo
+#   -i, --install      install hooks in this repo for automated update/apply
+#                      (pre-commit, post-checkout, and post-merge)
 #   -h, --help         print this help and exit
 #
 # Available OPTIONs are:
@@ -221,6 +222,23 @@ change_br=$3
 
 # apply metadata only when HEAD is changed
 if [ ${sha_new} != ${sha_old} ]; then
+    $(dirname "$0")/git-store-meta.pl --apply -d
+fi
+EOF
+    close(FILE);
+    chmod(0755, $t) == 1 || die "error: failed to set permissions on '$t': $!\n";
+    print "created `$t'\n";
+
+    $t = "$gitdir/hooks/post-merge";
+    open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
+    print FILE <<'EOF';
+#!/bin/sh
+# when running the hook, cwd is the top level of working tree
+
+is_squash=$1
+
+# apply metadata after a successful non-squash merge
+if [ $is_squash -eq 0 ]; then
     $(dirname "$0")/git-store-meta.pl --apply -d
 fi
 EOF
