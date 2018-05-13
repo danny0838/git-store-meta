@@ -79,7 +79,7 @@ Fields can be selectively applied. For example, to apply mtime only:
     .git/hooks/git-store-meta.pl --apply -f mtime
 
 For a similar reason it'd be preferable to add `--directory` option so that
-directory metadata are restored if they have been stored.
+metadata of directories are restored if they have been stored:
 
     .git/hooks/git-store-meta.pl --apply -d
 
@@ -100,9 +100,14 @@ environment variables must be explicitly provided to pass the check, such as:
 ### Update
 
 After a `--store` and commit, `--update` can be run to re-scan metadata only
-for changed files, which is much faster than to re-scan all revisioned files.
+for changed files, which is much faster than to re-scan all revisioned files:
+
+    .git/hooks/git-store-meta.pl --update
+
 `--directory` (`-d`) can be added so that each changed file makes its ancestor
-folders re-scanned.
+folders re-scanned:
+
+    .git/hooks/git-store-meta.pl --update -d
 
 Note that files or directories whose metadata have been changed without any
 content (or modes Git cares) change will not be awared, and a `--store` is
