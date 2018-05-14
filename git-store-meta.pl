@@ -316,7 +316,7 @@ sub get_file_metadata {
     );
     # output formatted data
     for (my $i=0; $i<=$#fields; $i++) {
-        push(@rec, $data{$fields[$i]} || "");
+        push(@rec, defined $data{$fields[$i]} ? $data{$fields[$i]} : "");
     }
     return @rec;
 }
