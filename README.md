@@ -28,9 +28,9 @@ Dependency:
 -------------------------------------------------------------------------------
 
 - git (any version)
-- sort (any version)
 - *nix platform with basic shell environment (required by Git)
 - perl >=5.8 with built-in modules (required by Git)
+- sort (any version) (required by Git)
 - setfacl, getfacl (optional, for manipulating ACL metadata)
 - touch, chown, chgrp (optional, for applying metadata to links)
 
@@ -78,8 +78,8 @@ Fields can be selectively applied. For example, to apply mtime only:
 
     .git/hooks/git-store-meta.pl --apply -f mtime
 
-For a similar reason it'd be preferable to add `--directory` option so that
-metadata of directories are restored if they have been stored:
+For a similar reason it'd be preferable to add `--directory` (`-d`) option so
+that metadata of directories are restored if they have been stored:
 
     .git/hooks/git-store-meta.pl --apply -d
 
