@@ -333,6 +333,7 @@ sub store {
         open(CMD, "$GIT ls-files -z |") or die;
         while(<CMD>) {
             chomp;
+            next if $_ eq $git_store_meta_filename;  # skip data file
             my $s = join("\t", get_file_metadata($_, \@fields));
             print TEMP_FILE "$s\n" if $s;
         }
@@ -463,8 +464,14 @@ sub update {
         if ($cur_file ne $last_file) {
             if ($cur_stat eq "M") {
                 # a modify => retrieve file metadata to print
-                my $s = join("\t", get_file_metadata(unescape_filename($cur_file), \@fields));
-                $cur_line = $s ? "$s\n" : "";
+                if ($cur_file eq $git_store_meta_filename) {
+                    # skip data file
+                    $cur_line = "";
+                }
+                else {
+                    my $s = join("\t", get_file_metadata(unescape_filename($cur_file), \@fields));
+                    $cur_line = $s ? "$s\n" : "";
+                }
             }
             print $cur_line;
             $last_file = $cur_file;
@@ -498,6 +505,7 @@ sub apply {
             # check for existence and type
             my $File = $data{'file'};  # escaped version, for printing
             my $file = unescape_filename($File);  # unescaped version, for using
+            next if $file eq $git_store_meta_filename;  # skip data file
             if (! -e $file && ! -l $file) {  # -e tests symlink target instead of the symlink itself
                 warn "warn: `$File' does not exist, skip applying metadata\n";
                 next;
