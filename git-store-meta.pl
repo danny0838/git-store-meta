@@ -494,7 +494,7 @@ sub apply {
                 next;
             }
             my $type = $data{'type'};
-            # a symbolic in git could be checked out as a plain file, simply see them as equal
+            # a symbolic link could be checked out as a plain file, simply see them as equal
             if ($type eq "f" || $type eq "l" ) {
                 if (! -f $file && ! -l $file) {
                     warn "warn: `$File' is not a file, skip applying metadata\n";
