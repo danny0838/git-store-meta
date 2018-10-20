@@ -360,7 +360,7 @@ sub update {
     list: {
         local $/ = "\0";
         # go through the diff list and append entries
-        open(CMD, "$GIT diff --name-status --cached -z |") or die;
+        open(CMD, "$GIT diff --name-status --cached --no-renames -z |") or die;
         while(my $stat = <CMD>) {
             chomp($stat);
             my $file = <CMD>;
