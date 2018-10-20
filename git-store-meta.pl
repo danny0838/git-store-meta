@@ -176,7 +176,7 @@ sub install_hooks {
     print "git directory: `$gitdir'\n";
 
     # Ensure the hook files don't already exist
-    foreach my $n ("pre-commit", "post-checkout") {
+    foreach my $n ("pre-commit", "post-checkout", "post-merge") {
         my $f = "$gitdir/hooks/$n";
         if (-e "$f") {
             die "error: hook file `$f' already exists.\n";
