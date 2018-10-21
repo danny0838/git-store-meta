@@ -19,7 +19,7 @@
 #   -d, --directory    Also store, update, or apply for directories. Or
 #                      install hooks that work for directories.
 #                      (available for: --store, --update, --apply, --install)
-#   -n, --noexec       Run a test and print the output, without real action.
+#   -n, --dry-run      Run a test and print the output, without real action.
 #                      (available for: --store, --update, --apply)
 #   -v, --verbose      Apply with verbose output.
 #                      (available for: --apply)
@@ -87,7 +87,7 @@ my %argv = (
     "field"      => "",
     "directory"  => 0,
     "force"      => 0,
-    "noexec"     => 0,
+    "dry-run"    => 0,
     "verbose"    => 0,
 );
 GetOptions(
@@ -99,7 +99,7 @@ GetOptions(
     "field|f=s",    \$argv{'field'},
     "directory|d",  \$argv{'directory'},
     "force",        \$argv{'force'},
-    "noexec|n",     \$argv{'noexec'},
+    "dry-run|n",    \$argv{'dry-run'},
     "verbose|v",    \$argv{'verbose'},
     "target|t=s",   \$argv{'target'},
 );
@@ -544,7 +544,7 @@ sub apply {
                     my $gid = (lstat($file))[5];
                     print "`$File' set user to '$data{'user'}'\n" if $argv{'verbose'};
                     if ($uid) {
-                        if (!$argv{'noexec'}) {
+                        if (!$argv{'dry-run'}) {
                             if (! -l $file) { $check = chown($uid, $gid, $file); }
                             else {
                                 my $cmd = join(" ", ("chown", "-h", escapeshellarg($data{'user'}), escapeshellarg("./$file"), "2>&1"));
@@ -563,7 +563,7 @@ sub apply {
                     my $uid = $data{'uid'};
                     my $gid = (lstat($file))[5];
                     print "`$File' set uid to '$uid'\n" if $argv{'verbose'};
-                    if (!$argv{'noexec'}) {
+                    if (!$argv{'dry-run'}) {
                         if (! -l $file) { $check = chown($uid, $gid, $file); }
                         else {
                             my $cmd = join(" ", ("chown", "-h", escapeshellarg($uid), escapeshellarg("./$file"), "2>&1"));
@@ -580,7 +580,7 @@ sub apply {
                     my $gid = (getgrnam($data{'group'}))[2];
                     print "`$File' set group to '$data{'group'}'\n" if $argv{'verbose'};
                     if ($gid) {
-                        if (!$argv{'noexec'}) {
+                        if (!$argv{'dry-run'}) {
                             if (! -l $file) { $check = chown($uid, $gid, $file); }
                             else {
                                 my $cmd = join(" ", ("chgrp", "-h", escapeshellarg($data{'group'}), escapeshellarg("./$file"), "2>&1"));
@@ -599,7 +599,7 @@ sub apply {
                     my $uid = (lstat($file))[4];
                     my $gid = $data{'gid'};
                     print "`$File' set gid to '$gid'\n" if $argv{'verbose'};
-                    if (!$argv{'noexec'}) {
+                    if (!$argv{'dry-run'}) {
                         if (! -l $file) { $check = chown($uid, $gid, $file); }
                         else {
                             my $cmd = join(" ", ("chgrp", "-h", escapeshellarg($gid), escapeshellarg("./$file"), "2>&1"));
@@ -613,12 +613,12 @@ sub apply {
             if ($fields_used{'mode'} && $data{'mode'} ne "" && ! -l $file) {
                 my $mode = oct($data{'mode'}) & 07777;
                 print "`$File' set mode to '$data{'mode'}'\n" if $argv{'verbose'};
-                $check = !$argv{'noexec'} ? chmod($mode, $file) : 1;
+                $check = !$argv{'dry-run'} ? chmod($mode, $file) : 1;
                 warn "warn: `$File' cannot set mode to '$data{'mode'}'\n" if !$check;
             }
             if ($fields_used{'acl'} && $data{'acl'} ne "") {
                 print "`$File' set acl to '$data{'acl'}'\n" if $argv{'verbose'};
-                if (!$argv{'noexec'}) {
+                if (!$argv{'dry-run'}) {
                     my $cmd = join(" ", ("setfacl", "-bm", escapeshellarg($data{'acl'}), escapeshellarg("./$file"), "2>&1"));
                     `$cmd`; $check = ($? == 0);
                 }
@@ -629,7 +629,7 @@ sub apply {
                 my $mtime = gmtime_to_timestamp($data{'mtime'});
                 my $atime = (lstat($file))[8];
                 print "`$File' set mtime to '$data{'mtime'}'\n" if $argv{'verbose'};
-                if (!$argv{'noexec'}) {
+                if (!$argv{'dry-run'}) {
                     if (! -l $file) { $check = utime($atime, $mtime, $file); }
                     else {
                         my $cmd = join(" ", ("touch", "-hcmd", escapeshellarg($data{'mtime'}), escapeshellarg("./$file"), "2>&1"));
@@ -643,7 +643,7 @@ sub apply {
                 my $mtime = (lstat($file))[9];
                 my $atime = gmtime_to_timestamp($data{'atime'});
                 print "`$File' set atime to '$data{'atime'}'\n" if $argv{'verbose'};
-                if (!$argv{'noexec'}) {
+                if (!$argv{'dry-run'}) {
                     if (! -l $file) { $check = utime($atime, $mtime, $file); }
                     else {
                         my $cmd = join(" ", ("touch", "-hcad", escapeshellarg($data{'atime'}), escapeshellarg("./$file"), "2>&1"));
@@ -746,7 +746,7 @@ sub main {
         print "storing metadata to `$git_store_meta_file' ...\n";
         # do the store
         print $field_info;
-        if (!$argv{'noexec'}) {
+        if (!$argv{'dry-run'}) {
             open(GIT_STORE_META_FILE, '>', $git_store_meta_file) or die;
             select(GIT_STORE_META_FILE);
             store(\@fields);
@@ -789,7 +789,7 @@ sub main {
         close(TEMP_FILE);
         close(GIT_STORE_META_FILE);
         # update cache
-        if (!$argv{'noexec'}) {
+        if (!$argv{'dry-run'}) {
             open(GIT_STORE_META_FILE, '>', $git_store_meta_file) or die;
             select(GIT_STORE_META_FILE);
             update(\@fields);
