@@ -5,37 +5,41 @@
 # Store, update, or apply metadata for files revisioned by Git.
 #
 # ACTION is one of:
-#   -s, --store        store the metadata for all files revisioned by Git
-#   -u, --update       update the metadata for changed files
-#   -a, --apply        apply the stored metadata to files in the working tree
-#   -i, --install      install hooks in this repo for automated update/apply
+#   -s, --store        Store the metadata for all files revisioned by Git.
+#   -u, --update       Update the metadata for changed files.
+#   -a, --apply        Apply the stored metadata to files in the working tree.
+#   -i, --install      Install hooks in this repo for automated update/apply.
 #                      (pre-commit, post-checkout, and post-merge)
-#   -h, --help         print this help and exit
+#   -h, --help         Print this help and exit.
 #
 # Available OPTIONs are:
-#   -t, --target FILE  specify a file as the data file. Defaults to
-#                      .git_store_meta in the root of working tree.
-#   -f, --field FIELDS fields to store or apply (see below). Defauls to pick
-#                      all fields in the current data file.
-#   -d, --directory    also store, update, or apply for directories
-#   -n, --noexec       run a test and print the output, without real action
+#   -f, --field FIELDs Fields to store or apply (see below). Defaults to pick
+#                      all fields in the current metadata store file.
+#                      (available for: --store, --apply)
+#   -d, --directory    Also store, update, or apply for directories. Or
+#                      install hooks that work for directories.
+#                      (available for: --store, --update, --apply, --install)
+#   -n, --noexec       Run a test and print the output, without real action.
 #                      (available for: --store, --update, --apply)
-#   -v, --verbose      apply with verbose output
+#   -v, --verbose      Apply with verbose output.
 #                      (available for: --apply)
-#   --force            force an apply even if working tree is not clean
+#   --force            Force an apply even if the working tree is not clean.
 #                      (available for: --apply)
+#   -t, --target FILE  Specify another filename to store metadata. Defaults to
+#                      ".git_store_meta" in the root of the working tree.
+#                      (available for: --store, --update, --apply)
 #
-# FIELDS is a comma separated string composed of following values:
+# FIELDs is a comma-separated string consisting of the following values:
 #   mtime   last modified time
 #   atime   last access time
-#   mode    unix permissions
+#   mode    Unix permissions
 #   user    user name
 #   group   group name
-#   uid     user id (if user is also set, attempt to apply user first, and then
+#   uid     user ID (if user is also set, attempt to apply user first, and then
 #           fallback to uid)
-#   gid     group id (if group is also set, attempt to apply group first, and
+#   gid     group ID (if group is also set, attempt to apply group first, and
 #           then fallback to gid)
-#   acl     access control lists for setfacl/getfacl
+#   acl     access control lists for POSIX setfacl/getfacl
 #
 # git-store-meta 1.2.7
 # Copyright (c) 2015-2018, Danny Lin
@@ -143,7 +147,7 @@ sub escape_filename {
 }
 
 # reverse of escape_filename
-# "\\" should never happen, but is supported for backward compatibility
+# "\\" is left for backward compatibility with versions < 1.1.4
 sub unescape_filename {
     my ($str) = @_;
     $str =~ s!\\(?:x([0-9A-Fa-f]{2})|\\)!$1?chr(hex($1)):"\\"!eg;
@@ -705,9 +709,7 @@ sub main {
     my ($cache_file_exist, $cache_file_accessible, $cache_header_valid, $app, $version, $cache_fields) = get_cache_header_info($git_store_meta_file);
     my @cache_fields = @{$cache_fields};
 
-    # parse fields list
-    # use $argv{'field'} if defined, or use fields in the cache file
-    # special handling for --update, which must use fields in the cache file
+    # parse field list
     my %fields_used = (
         "file"  => 0,
         "type"  => 0,
@@ -722,12 +724,15 @@ sub main {
     );
     my @fields;
     my @parts;
+    # use $argv{'field'} if defined, or use fields in the cache file
+    # special handling for --update, which must use fields in the cache file
     if (!$argv{'field'} && $cache_header_valid || $action eq "update") {
         @parts = @cache_fields;
     }
     else {
         push(@parts, ("file", "type"), split(/,\s*/, $argv{'field'}));
     }
+    # remove undefined and/or duplicated fields
     for (my $i=0; $i<=$#parts; $i++) {
         if (exists($fields_used{$parts[$i]}) && !$fields_used{$parts[$i]}) {
             $fields_used{$parts[$i]} = 1;
