@@ -761,14 +761,14 @@ sub main {
         if (!$cache_file_accessible) {
             die "error: unable to access `$git_store_meta_file'.\n";
         }
+        if (!$cache_header_valid) {
+            die "error: `$git_store_meta_file' is malformatted.\nFix it or run --store to create new.\n";
+        }
         if ($app ne $GIT_STORE_META_APP) {
             die "error: `$git_store_meta_file' is using another schema: $app $version\nRun --store to create new.\n";
         }
         if (!($version =~ m!^1\.2\..+$! || $version =~ m!^1\.1\..+$!)) {
             die "error: current cache uses an unsupported schema of version: $version\n";
-        }
-        if (!$cache_header_valid) {
-            die "error: `$git_store_meta_file' is malformatted.\nFix it or run --store to create new.\n";
         }
         # do the update
         print $field_info;
@@ -810,11 +810,11 @@ sub main {
         if (!$cache_file_accessible) {
             die "error: unable to access `$git_store_meta_file'.\n";
         }
-        if ($app ne $GIT_STORE_META_APP) {
-            die "error: unable to apply metadata using the schema: $app $version\n";
-        }
         if (!$cache_header_valid) {
             die "error: `$git_store_meta_file' is malformatted.\n";
+        }
+        if ($app ne $GIT_STORE_META_APP) {
+            die "error: unable to apply metadata using the schema: $app $version\n";
         }
         # do the apply
         print $field_info;
