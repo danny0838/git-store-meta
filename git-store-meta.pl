@@ -13,8 +13,9 @@
 #   -h, --help         Print this help and exit.
 #
 # Available OPTIONs are:
-#   -f, --field FIELDs Fields to store or apply (see below). Defaults to pick
-#                      all fields in the current metadata store file.
+#   -f, --field FIELDs Fields to store or apply (see below). If omitted, all
+#                      fields in the current metadata store file are picked if
+#                      it exists; otherwise, "mtime" is picked.
 #                      (available for: --store, --apply)
 #   -d, --directory    Also store, update, or apply for directories. Or
 #                      install hooks that work for directories.
@@ -726,11 +727,17 @@ sub main {
     my @parts;
     # use $argv{'field'} if defined, or use fields in the cache file
     # special handling for --update, which must use fields in the cache file
-    if (!$argv{'field'} && $cache_header_valid || $action eq "update") {
+    if ($action eq "update") {
+        @parts = @cache_fields;
+    }
+    elsif ($argv{'field'}) {
+        push(@parts, ("file", "type"), split(/,\s*/, $argv{'field'}));
+    }
+    elsif ($cache_header_valid) {
         @parts = @cache_fields;
     }
     else {
-        push(@parts, ("file", "type"), split(/,\s*/, $argv{'field'}));
+        @parts = ("file", "type", "mtime");
     }
     # remove undefined and/or duplicated fields
     for (my $i=0; $i<=$#parts; $i++) {
