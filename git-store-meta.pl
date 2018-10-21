@@ -653,7 +653,7 @@ sub apply {
         close(GIT_STORE_META_FILE);
     }
     else {
-        die "error: current cache uses an unsupported schema of version: $version\n";
+        die "error: current cache is using an unsupported version: $version\n";
     }
 }
 
@@ -765,10 +765,10 @@ sub main {
             die "error: `$git_store_meta_file' is malformatted.\nFix it or run --store to create new.\n";
         }
         if ($app ne $GIT_STORE_META_APP) {
-            die "error: `$git_store_meta_file' is using another schema: $app $version\nRun --store to create new.\n";
+            die "error: `$git_store_meta_file' is using an unknown schema: $app $version\nFix it or run --store to create new.\n";
         }
         if (!($version =~ m!^1\.2\..+$! || $version =~ m!^1\.1\..+$!)) {
-            die "error: current cache uses an unsupported schema of version: $version\n";
+            die "error: current cache is using an unsupported version: $version\n";
         }
         # do the update
         print $field_info;
@@ -814,7 +814,7 @@ sub main {
             die "error: `$git_store_meta_file' is malformatted.\n";
         }
         if ($app ne $GIT_STORE_META_APP) {
-            die "error: unable to apply metadata using the schema: $app $version\n";
+            die "error: `$git_store_meta_file' is using an unknown schema: $app $version\n";
         }
         # do the apply
         print $field_info;
