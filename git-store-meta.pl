@@ -42,7 +42,7 @@
 #           then fallback to gid)
 #   acl     access control lists for POSIX setfacl/getfacl
 #
-# git-store-meta 1.2.7
+# git-store-meta 1.3.0
 # Copyright (c) 2015-2018, Danny Lin
 # Released under MIT License
 # Project home: http://github.com/danny0838/git-store-meta
@@ -52,7 +52,7 @@
 use utf8;
 use strict;
 
-use version; our $VERSION = version->declare("v1.2.7");
+use version; our $VERSION = version->declare("v1.3.0");
 use Getopt::Long;
 Getopt::Long::Configure qw(gnu_getopt);
 use Cwd;
@@ -490,9 +490,9 @@ sub apply {
     my %fields_used = %{$fields_used};
     my @cache_fields = @{$cache_fields};
 
-    # v1.0.0 ~ v1.2.* share same apply procedure
+    # v1.0.0 ~ v1.3.* share same apply procedure
     # (files with a bad file name recorded in 1.0.* will be skipped)
-    if (1.0.0 <= $version && $version < 1.3.0) {
+    if (1.0.0 <= $version && $version < 1.4.0) {
         my $count = 0;
         open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
         while (my $line = <GIT_STORE_META_FILE>) {
@@ -779,7 +779,7 @@ sub main {
         if ($app ne $GIT_STORE_META_APP) {
             die "error: `$git_store_meta_file' is using an unknown schema: $app $version\nFix it or run --store to create new.\n";
         }
-        if (!(1.1.0 <= $version && $version < 1.3.0)) {
+        if (!(1.1.0 <= $version && $version < 1.4.0)) {
             die "error: current cache is using an unsupported version: $version\n";
         }
         # do the update
