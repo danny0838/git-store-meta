@@ -544,7 +544,7 @@ sub apply {
                     my $uid = (getpwnam($data{'user'}))[2];
                     my $gid = (lstat($file))[5];
                     print "`$File' set user to '$data{'user'}'\n" if $argv{'verbose'};
-                    if ($uid) {
+                    if (defined $uid) {
                         if (!$argv{'dry-run'}) {
                             if (! -l $file) { $check = chown($uid, $gid, $file); }
                             else {
@@ -580,7 +580,7 @@ sub apply {
                     my $uid = (lstat($file))[4];
                     my $gid = (getgrnam($data{'group'}))[2];
                     print "`$File' set group to '$data{'group'}'\n" if $argv{'verbose'};
-                    if ($gid) {
+                    if (defined $gid) {
                         if (!$argv{'dry-run'}) {
                             if (! -l $file) { $check = chown($uid, $gid, $file); }
                             else {
