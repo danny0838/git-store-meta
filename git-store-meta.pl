@@ -373,6 +373,7 @@ sub update {
     # append new entries to the temp file
     open(TEMP_FILE, ">>", $temp_file) or die;
     list: {
+        # set input record separator for chomp
         local $/ = "\0";
         # go through the diff list and append entries
         open(CMD, "$GIT diff --name-status --cached --no-renames -z |") or die;
@@ -383,7 +384,7 @@ sub update {
             if ($stat ne "D") {
                 # a modified (including added) file
                 print TEMP_FILE escape_filename($file)."\0\2M\0\n";
-                # parent directories also mark as modified
+                # mark ancestor directories as modified
                 if ($argv{'directory'}) {
                     my @parts = split("/", $file);
                     pop(@parts);
@@ -397,7 +398,7 @@ sub update {
             else {
                 # a deleted file
                 print TEMP_FILE escape_filename($file)."\0\0D\0\n";
-                # parent directories also mark as deleted (temp and could be cancelled)
+                # mark ancestor directories as deleted (temp and revertable)
                 if ($argv{'directory'}) {
                     my @parts = split("/", $file);
                     pop(@parts);
@@ -452,20 +453,22 @@ sub update {
                 $cur_line = "";
             }
             elsif ($cur_stat eq "H") {
-                # a placeholder => recover previous "delete"
+                # a placeholder => revert previous "delete"
                 # This is after a delete (optionally) and before a modify or
-                # normal line (must). We clear $last_file so the next line will
+                # no-op line (must). We clear $last_file so the next line will
                 # see a "path change" and be printed.
                 $last_file = "";
                 next;
             }
         }
         else {
-            # a normal line
+            # a no-op line
             $cur_stat = "";
             ($cur_file) = split("\t", $cur_line);
             $cur_line .= "\n";
         }
+
+        # print for a new file
         if ($cur_file ne $last_file) {
             if ($cur_stat eq "M") {
                 # a modify => retrieve file metadata to print
