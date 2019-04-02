@@ -381,8 +381,12 @@ sub update {
             chomp($stat);
             my $file = <CMD>;
             chomp($file);
-            if ($stat ne "D") {
-                # a modified (including added) file
+            if ($stat eq "M") {
+                # a modified file
+                print TEMP_FILE escape_filename($file)."\0\2M\0\n";
+            }
+            elsif ($stat eq "A") {
+                # an added file
                 print TEMP_FILE escape_filename($file)."\0\2M\0\n";
                 # mark ancestor directories as modified
                 if ($argv{'directory'}) {
@@ -395,7 +399,7 @@ sub update {
                     }
                 }
             }
-            else {
+            elsif ($stat eq "D") {
                 # a deleted file
                 print TEMP_FILE escape_filename($file)."\0\0D\0\n";
                 # mark ancestor directories as deleted (temp and revertable)
