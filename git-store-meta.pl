@@ -399,9 +399,14 @@ sub update {
                 # a deleted file
                 print TEMP_FILE escape_filename($file)."\0\0D\0\n";
                 # mark ancestor directories as deleted (temp and revertable)
+                # mark parent directory as modified
                 if ($argv{'directory'}) {
                     my @parts = split("/", $file);
                     pop(@parts);
+                    if ($#parts >= 0) {
+                        $file = join("/", @parts);
+                        print TEMP_FILE escape_filename($file)."\0\2M\0\n";
+                    }
                     while ($#parts >= 0) {
                         $file = join("/", @parts);
                         print TEMP_FILE escape_filename($file)."\0\0D\0\n";
