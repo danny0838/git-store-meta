@@ -36,16 +36,14 @@
 #   mode    Unix permissions
 #   user    user name
 #   group   group name
-#   uid     user ID (if user is also set, attempt to apply user first, and then
-#           fallback to uid)
-#   gid     group ID (if group is also set, attempt to apply group first, and
-#           then fallback to gid)
+#   uid     user ID (if user is also set, prefer user and fallback to uid)
+#   gid     group ID (if group is also set, prefer group and fallback to gid)
 #   acl     access control lists for POSIX setfacl/getfacl
 #
 # git-store-meta 1.3.2
-# Copyright (c) 2015-2018, Danny Lin
+# Copyright (c) 2015-2019, Danny Lin
 # Released under MIT License
-# Project home: http://github.com/danny0838/git-store-meta
+# Project home: https://github.com/danny0838/git-store-meta
 #
 # =============================================================================
 
@@ -334,6 +332,7 @@ sub store {
     # read the file list and write retrieved metadata to a temp file
     open(TEMP_FILE, ">", $temp_file) or die;
     list: {
+        # set input record separator for chomp
         local $/ = "\0";
         open(CMD, "$GIT ls-files -z |") or die;
         while(<CMD>) {

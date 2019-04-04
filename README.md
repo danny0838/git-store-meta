@@ -37,9 +37,9 @@ Dependency:
 Usage:
 -------------------------------------------------------------------------------
 
-Copy the `git-store-meta.pl` file to `path/to/your/repo/.git/hooks/`, change
-the working directory to the Git working tree, and run one of the commands
-below.
+Copy the `git-store-meta.pl` file to `/path/to/your/repo/.git/hooks/`, add
+executable permission to it, change the working directory to the Git working
+tree, and run one of the commands below.
 
 ### Store
 
@@ -99,13 +99,13 @@ environment variables must be explicitly provided to pass the check, such as:
 
 ### Update
 
-After a `--store` and commit, `--update` can be run to re-scan metadata only
+After a `--store` and commit, `--update` can be run to update metadata only
 for changed files, which is much faster than to re-scan all revisioned files:
 
     .git/hooks/git-store-meta.pl --update
 
-`--directory` (`-d`) can be added so that each changed file makes its ancestor
-folders re-scanned:
+`--directory` (`-d`) can be added so that changed directories (those with
+added, deleted, or renamed files) are also updated:
 
     .git/hooks/git-store-meta.pl --update -d
 
@@ -122,19 +122,18 @@ checkout or merge for files, run:
 
     .git/hooks/git-store-meta.pl --install
 
+to generate `pre-commit`, `post-checkout`, and `post-merge` hooks for the
+current Git repo. Of course you can modify the hooks afterwards to fit your
+needs better.
+
 The `--directory` (`-d`) option can be provided so that metadata of directories
 are also handled:
 
     .git/hooks/git-store-meta.pl --install -d
 
-This will generate `pre-commit`, `post-checkout`, and `post-merge` hooks for
-the current Git repo. Of course you can modify the hooks afterwards to fit
-your needs better.
-
-Note that the installation is skipped if there's already an existed hook with
-a same name to avoid a dangerous overwrite. In this case you'd have to rename
-the existed hook file, run the installation, and merge the hook contents
-manually.
+Note that the installation is skipped to avoid a dangerous overwrite if there
+are existing hooks. In this case you can rename the existing hook files, run
+the installation again, and merge the hook contents manually.
 
 Note that since Git doesn't provide a "post-reset" hook, git-store-meta doesn't
 run after a successful `git reset --hard`. To restore file metadata after a
