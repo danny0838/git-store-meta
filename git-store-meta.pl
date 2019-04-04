@@ -28,7 +28,7 @@
 #                      (available for: --apply)
 #   -t, --target FILE  Specify another filename to store metadata. Defaults to
 #                      ".git_store_meta" in the root of the working tree.
-#                      (available for: --store, --update, --apply)
+#                      (available for: --store, --update, --apply, --install)
 #
 # FIELDs is a comma-separated string consisting of the following values:
 #   mtime   last modified time
@@ -189,11 +189,13 @@ sub install_hooks {
 
     # Install the hooks
     my $t;
+    my $f = ($argv{'target'} ne "") ? " -t " . escapeshellarg($argv{'target'}) : "";
+    my $f2 = escapeshellarg(($argv{'target'} ne "") ? $argv{'target'} : $GIT_STORE_META_FILENAME);
     my $d = $argv{'directory'} ? " -d" : "";
 
     $t = "$gitdir/hooks/pre-commit";
     open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
-    printf FILE <<'EOF', $d, $d;
+    printf FILE <<'EOF', $d, $f, $d, $f, $f2;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
@@ -201,12 +203,12 @@ script=$(dirname "$0")/git-store-meta.pl
 [ ! -x "$script" ] && script=git-store-meta.pl
 
 # update (or store as fallback)
-"$script" --update%s ||
-"$script" --store%s ||
+"$script" --update%s%s ||
+"$script" --store%s%s ||
 exit 1
 
 # remember to add the updated cache file
-git add .git_store_meta
+git add %s
 EOF
     close(FILE);
     chmod(0755, $t) == 1 || die "error: failed to set permissions on '$t': $!\n";
@@ -214,7 +216,7 @@ EOF
 
     $t = "$gitdir/hooks/post-checkout";
     open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
-    print FILE <<'EOF';
+    printf FILE <<'EOF', $f;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
@@ -227,7 +229,7 @@ change_br=$3
 
 # apply metadata only when HEAD is changed
 if [ ${sha_new} != ${sha_old} ]; then
-    "$script" --apply -d
+    "$script" --apply -d%s
 fi
 EOF
     close(FILE);
@@ -236,7 +238,7 @@ EOF
 
     $t = "$gitdir/hooks/post-merge";
     open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
-    print FILE <<'EOF';
+    printf FILE <<'EOF', $f;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
@@ -247,7 +249,7 @@ is_squash=$1
 
 # apply metadata after a successful non-squash merge
 if [ $is_squash -eq 0 ]; then
-    "$script" --apply -d
+    "$script" --apply -d%s
 fi
 EOF
     close(FILE);
