@@ -290,6 +290,52 @@ sub get_cache_header_info {
     return ($cache_file_exist, $cache_file_accessible, $cache_header_valid, $app, $version, \@fields);
 }
 
+sub get_fields {
+    my ($action, $cache_header_valid, $cache_fields) = @_;
+    my @cache_fields = @{$cache_fields};
+
+    # parse field list
+    my %fields_used = (
+        "file"  => 0,
+        "type"  => 0,
+        "mtime" => 0,
+        "atime" => 0,
+        "mode"  => 0,
+        "uid"   => 0,
+        "gid"   => 0,
+        "user"  => 0,
+        "group" => 0,
+        "acl"   => 0,
+    );
+
+    # use $argv{'field'} if defined, or use fields in the cache file
+    my @parts;
+    if ($action eq "update") {
+        # special handling for --update, which must use fields in the cache file
+        @parts = @cache_fields;
+    }
+    elsif ($argv{'field'}) {
+        push(@parts, ("file", "type"), split(/,\s*/, $argv{'field'}));
+    }
+    elsif ($cache_header_valid) {
+        @parts = @cache_fields;
+    }
+    else {
+        @parts = ("file", "type", "mtime");
+    }
+
+    # remove undefined and/or duplicated fields
+    my @fields;
+    for (my $i=0; $i<=$#parts; $i++) {
+        if (exists($fields_used{$parts[$i]}) && !$fields_used{$parts[$i]}) {
+            $fields_used{$parts[$i]} = 1;
+            push(@fields, $parts[$i]);
+        }
+    }
+
+    return (\%fields_used, \@fields);
+}
+
 sub get_file_metadata {
     my ($file, $fields) = @_;
     my @fields = @{$fields};
@@ -721,49 +767,16 @@ sub main {
     my ($cache_file_exist, $cache_file_accessible, $cache_header_valid, $app, $version, $cache_fields) = get_cache_header_info($git_store_meta_file);
     my @cache_fields = @{$cache_fields};
 
-    # parse field list
-    my %fields_used = (
-        "file"  => 0,
-        "type"  => 0,
-        "mtime" => 0,
-        "atime" => 0,
-        "mode"  => 0,
-        "uid"   => 0,
-        "gid"   => 0,
-        "user"  => 0,
-        "group" => 0,
-        "acl"   => 0,
-    );
-    my @fields;
-    my @parts;
-    # use $argv{'field'} if defined, or use fields in the cache file
-    # special handling for --update, which must use fields in the cache file
-    if ($action eq "update") {
-        @parts = @cache_fields;
-    }
-    elsif ($argv{'field'}) {
-        push(@parts, ("file", "type"), split(/,\s*/, $argv{'field'}));
-    }
-    elsif ($cache_header_valid) {
-        @parts = @cache_fields;
-    }
-    else {
-        @parts = ("file", "type", "mtime");
-    }
-    # remove undefined and/or duplicated fields
-    for (my $i=0; $i<=$#parts; $i++) {
-        if (exists($fields_used{$parts[$i]}) && !$fields_used{$parts[$i]}) {
-            $fields_used{$parts[$i]} = 1;
-            push(@fields, $parts[$i]);
-        }
-    }
-    my $field_info = "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
-
     # handle action: store, update, apply
     if ($action eq "store") {
         print "storing metadata to `$git_store_meta_file' ...\n";
+
+        # get and show fields
+        my ($fields_used, $fields) = get_fields($action, $cache_header_valid, \@cache_fields);
+        my @fields = @{$fields};
+        print "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
+
         # do the store
-        print $field_info;
         if (!$argv{'dry-run'}) {
             open(GIT_STORE_META_FILE, '>', $git_store_meta_file) or die;
             select(GIT_STORE_META_FILE);
@@ -777,6 +790,7 @@ sub main {
     }
     elsif ($action eq "update") {
         print "updating metadata to `$git_store_meta_file' ...\n";
+
         # validate
         if (!$cache_file_exist) {
             die "error: `$git_store_meta_file' doesn't exist.\nRun --store to create new.\n";
@@ -793,8 +807,14 @@ sub main {
         if (!(1.1.0 <= $version && $version < 1.4.0)) {
             die "error: `$git_store_meta_file' is using an unsupported version: $version\n";
         }
+
+        # get and show fields
+        my ($fields_used, $fields) = get_fields($action, $cache_header_valid, \@cache_fields);
+        my @fields = @{$fields};
+        print "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
+
         # do the update
-        print $field_info;
+
         # copy the cache file to the temp file
         # to prevent a conflict in further operation
         open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
@@ -806,6 +826,7 @@ sub main {
         }
         close(TEMP_FILE);
         close(GIT_STORE_META_FILE);
+
         # update cache
         if (!$argv{'dry-run'}) {
             open(GIT_STORE_META_FILE, '>', $git_store_meta_file) or die;
@@ -817,11 +838,13 @@ sub main {
         else {
             update(\@fields);
         }
+
         # clean up
         my $clear = unlink($temp_file);
     }
     elsif ($action eq "apply") {
         print "applying metadata from `$git_store_meta_file' ...\n";
+
         # validate
         if (!$cache_file_exist) {
             print "`$git_store_meta_file' doesn't exist, skipped.\n";
@@ -839,9 +862,14 @@ sub main {
         if ($app ne $GIT_STORE_META_APP) {
             die "error: `$git_store_meta_file' is using an unknown schema: $app $version\n";
         }
+
+        # get and show fields
+        my ($fields_used, $fields) = get_fields($action, $cache_header_valid, \@cache_fields);
+        my @fields = @{$fields};
+        print "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
+
         # do the apply
-        print $field_info;
-        apply(\%fields_used, \@cache_fields, $version);
+        apply($fields_used, \@cache_fields, $version);
     }
 }
 
