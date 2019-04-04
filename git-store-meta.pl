@@ -188,23 +188,21 @@ sub install_hooks {
     }
 
     # Install the hooks
-    my $t = "$gitdir/hooks/git-store-meta.pl";
-    if (!-e $t) {
-        copy($script, $t) or die "error: failed to copy `$script' to '$t': $!\n";
-        chmod(0755, $t) == 1 or die "error: failed to set permissions on '$t': $!\n";
-        print "created `$t'\n";
-    }
+    my $t;
+    my $d = $argv{'directory'} ? " -d" : "";
 
     $t = "$gitdir/hooks/pre-commit";
-    my $d = $argv{'directory'} ? " -d" : "";
     open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
     printf FILE <<'EOF', $d, $d;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
+script=$(dirname "$0")/git-store-meta.pl
+[ ! -x "$script" ] && script=git-store-meta.pl
+
 # update (or store as fallback)
-$(dirname "$0")/git-store-meta.pl --update%s ||
-$(dirname "$0")/git-store-meta.pl --store%s ||
+"$script" --update%s ||
+"$script" --store%s ||
 exit 1
 
 # remember to add the updated cache file
@@ -220,13 +218,16 @@ EOF
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
+script=$(dirname "$0")/git-store-meta.pl
+[ ! -x "$script" ] && script=git-store-meta.pl
+
 sha_old=$1
 sha_new=$2
 change_br=$3
 
 # apply metadata only when HEAD is changed
 if [ ${sha_new} != ${sha_old} ]; then
-    $(dirname "$0")/git-store-meta.pl --apply -d
+    "$script" --apply -d
 fi
 EOF
     close(FILE);
@@ -239,11 +240,14 @@ EOF
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
+script=$(dirname "$0")/git-store-meta.pl
+[ ! -x "$script" ] && script=git-store-meta.pl
+
 is_squash=$1
 
 # apply metadata after a successful non-squash merge
 if [ $is_squash -eq 0 ]; then
-    $(dirname "$0")/git-store-meta.pl --apply -d
+    "$script" --apply -d
 fi
 EOF
     close(FILE);
