@@ -67,10 +67,10 @@ If `--fields` is not provided, git-store-meta takes the fields defined in the
 current data file, and thus running `git-store-meta.pl --store` works in most
 usual cases.
 
-The `--directory` (`-d`) option can be provided so that all directories under
-Git revision control have their metadata stored, too.
+If `directory` is included in `--fields`, metadata of every directory under Git
+revision control is also stored:
 
-    git-store-meta.pl --store -d
+    git-store-meta.pl --store -f mtime,directory
 
 ### Apply
 
@@ -84,10 +84,10 @@ Fields can be selectively applied. For example, to apply mtime only:
 
     git-store-meta.pl --apply -f mtime
 
-For a similar reason it'd be preferable to add `--directory` (`-d`) option so
-that metadata of directories are restored if they have been stored:
+Similarly, include `directory` in `--fields` to restore metadata for
+directories as well:
 
-    git-store-meta.pl --apply -d
+    git-store-meta.pl --apply -f mtime,directory
 
 Furthermore, the `--verbose` (`-v`) option can be used to info what exactly are
 being applied.
@@ -106,14 +106,10 @@ environment variables must be explicitly provided to pass the check, such as:
 ### Update
 
 After a `--store` and commit, `--update` can be run to update metadata only
-for changed files, which is much faster than to re-scan all revisioned files:
+for changed files and directories, which is much faster than to re-scan all
+revisioned ones:
 
     git-store-meta.pl --update
-
-`--directory` (`-d`) can be added so that changed directories (those with
-added, deleted, or renamed files) are also updated:
-
-    git-store-meta.pl --update -d
 
 Note that files or directories not considered changed by Git are not updated,
 even if their metadata have been changed, and a `--store` is required to record
@@ -131,11 +127,6 @@ checkout or merge for files, run:
 to generate `pre-commit`, `post-checkout`, and `post-merge` hooks for the
 current Git repo. Of course you can modify the hooks afterwards to fit your
 needs better.
-
-The `--directory` (`-d`) option can be provided so that metadata of directories
-are also handled:
-
-    git-store-meta.pl --install -d
 
 Note that the installation is skipped to avoid a dangerous overwrite if there
 are existing hooks. In this case you can rename the existing hook files, run

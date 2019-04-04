@@ -17,9 +17,6 @@
 #                      current metadata store file are picked if possible;
 #                      otherwise, "mtime" is picked as the default.
 #                      (available for: --store, --apply)
-#   -d|--directory     Also store, update, or apply for directories. Or
-#                      install hooks that work for directories.
-#                      (available for: --store, --update, --apply, --install)
 #   -n|--dry-run       Run a test and print the output, without real action.
 #                      (available for: --store, --update, --apply)
 #   -v|--verbose       Apply with verbose output.
@@ -32,14 +29,15 @@
 #                      (available for: --store, --update, --apply, --install)
 #
 # FIELDs is a comma-separated string consisting of the following values:
-#   mtime   last modified time
-#   atime   last access time
-#   mode    Unix permissions
-#   user    user name
-#   group   group name
-#   uid     user ID (if user is also set, prefer user and fallback to uid)
-#   gid     group ID (if group is also set, prefer group and fallback to gid)
-#   acl     access control lists for POSIX setfacl/getfacl
+#   mtime      last modified time
+#   atime      last access time
+#   mode       Unix permissions
+#   user       user name
+#   group      group name
+#   uid        user ID (if user is also set, prefer user and fallback to uid)
+#   gid        group ID (if group is also set, prefer group and fallback to gid)
+#   acl        access control lists for POSIX setfacl/getfacl
+#   directory  include directories
 #
 # git-store-meta 1.3.3
 # Copyright (c) 2015-2019, Danny Lin
@@ -92,7 +90,6 @@ my %argv = (
     "help"       => 0,
     "target"     => "",
     "fields"     => "",
-    "directory"  => 0,
     "force"      => 0,
     "dry-run"    => 0,
     "verbose"    => 0,
@@ -104,7 +101,6 @@ GetOptions(
     "install|i",    \$argv{'install'},
     "help|h",       \$argv{'help'},
     "fields|f=s",   \$argv{'fields'},
-    "directory|d",  \$argv{'directory'},
     "force",        \$argv{'force'},
     "dry-run|n",    \$argv{'dry-run'},
     "verbose|v",    \$argv{'verbose'},
@@ -203,11 +199,10 @@ sub install_hooks {
     my $t;
     my $f = ($argv{'target'} ne "") ? " -t " . escapeshellarg($argv{'target'}) : "";
     my $f2 = escapeshellarg(($argv{'target'} ne "") ? $argv{'target'} : $GIT_STORE_META_FILENAME);
-    my $d = $argv{'directory'} ? " -d" : "";
 
     $t = "$gitdir/hooks/pre-commit";
     open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
-    printf FILE <<'EOF', $d, $f, $d, $f, $f2;
+    printf FILE <<'EOF', $f, $f, $f2;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
@@ -215,8 +210,8 @@ script=$(dirname "$0")/git-store-meta.pl
 [ ! -x "$script" ] && script=git-store-meta.pl
 
 # update (or store as fallback)
-"$script" --update%s%s ||
-"$script" --store%s%s ||
+"$script" --update%s ||
+"$script" --store%s ||
 exit 1
 
 # remember to add the updated cache file
@@ -241,7 +236,7 @@ change_br=$3
 
 # apply metadata only when HEAD is changed
 if [ ${sha_new} != ${sha_old} ]; then
-    "$script" --apply -d%s
+    "$script" --apply%s
 fi
 EOF
     close(FILE);
@@ -261,7 +256,7 @@ is_squash=$1
 
 # apply metadata after a successful non-squash merge
 if [ $is_squash -eq 0 ]; then
-    "$script" --apply -d%s
+    "$script" --apply%s
 fi
 EOF
     close(FILE);
@@ -325,6 +320,7 @@ sub get_fields {
         "user"  => 0,
         "group" => 0,
         "acl"   => 0,
+        "directory" => 0,
     );
 
     # use $argv{'fields'} if defined, or use fields in the cache file
@@ -382,6 +378,7 @@ sub get_file_metadata {
         "user"  => $user,
         "group" => $group,
         "acl"   => $acl,
+        "directory"   => "",
     );
     # output formatted data
     foreach (@fields) {
@@ -392,6 +389,7 @@ sub get_file_metadata {
 
 sub store {
     my @fields = @_;
+    my %fields_used = map { $_ => 1 } @fields;
 
     # read the file list and write retrieved metadata to a temp file
     open(TEMP_FILE, ">", $temp_file) or die;
@@ -406,7 +404,7 @@ sub store {
             print TEMP_FILE "$s\n" if $s;
         }
         close(CMD);
-        if ($argv{'directory'}) {
+        if ($fields_used{'directory'}) {
             open(CMD, "$GIT ls-tree -rd --name-only -z \$($GIT write-tree) |") or die;
             while(<CMD>) {
                 chomp;
@@ -431,6 +429,7 @@ sub store {
 
 sub update {
     my @fields = @_;
+    my %fields_used = map { $_ => 1 } @fields;
 
     # append new entries to the temp file
     open(TEMP_FILE, ">>", $temp_file) or die;
@@ -451,7 +450,7 @@ sub update {
                 # an added file
                 print TEMP_FILE escape_filename($file)."\0\2M\0\n";
                 # mark ancestor directories as modified
-                if ($argv{'directory'}) {
+                if ($fields_used{'directory'}) {
                     my @parts = split("/", $file);
                     pop(@parts);
                     while ($#parts >= 0) {
@@ -466,7 +465,7 @@ sub update {
                 print TEMP_FILE escape_filename($file)."\0\0D\0\n";
                 # mark ancestor directories as deleted (temp and revertable)
                 # mark parent directory as modified
-                if ($argv{'directory'}) {
+                if ($fields_used{'directory'}) {
                     my @parts = split("/", $file);
                     pop(@parts);
                     if ($#parts >= 0) {
@@ -483,7 +482,7 @@ sub update {
         }
         close(CMD);
         # add all directories as a placeholder, which prevents deletion
-        if ($argv{'directory'}) {
+        if ($fields_used{'directory'}) {
             open(CMD, "$GIT ls-tree -rd --name-only -z \$($GIT write-tree) |") or die;
             while(<CMD>) { chomp; print TEMP_FILE "$_\0\1H\0\n"; }
             close(CMD);
@@ -603,7 +602,7 @@ sub apply {
                     warn "warn: `$File' is not a directory, skip applying metadata\n";
                     next;
                 }
-                if (!$argv{'directory'}) {
+                if (!$fields_used{'directory'}) {
                     next;
                 }
             }
@@ -789,7 +788,7 @@ sub main {
 
         # get and show fields
         my @fields = get_fields();
-        print "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
+        print "fields: " . join(", ", @fields) . "\n";
 
         # do the store
         if (!$argv{'dry-run'}) {
@@ -825,7 +824,7 @@ sub main {
 
         # get and show fields
         my @fields = get_fields();
-        print "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
+        print "fields: " . join(", ", @fields) . "\n";
 
         # do the update
 
@@ -879,7 +878,7 @@ sub main {
 
         # get and show fields
         my @fields = get_fields();
-        print "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
+        print "fields: " . join(", ", @fields) . "\n";
 
         # do the apply
         apply(@fields);
