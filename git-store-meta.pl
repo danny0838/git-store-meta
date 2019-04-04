@@ -39,7 +39,7 @@
 #   acl        access control lists for POSIX setfacl/getfacl
 #   directory  include directories
 #
-# git-store-meta 1.3.3
+# git-store-meta 2.0.0_001
 # Copyright (c) 2015-2019, Danny Lin
 # Released under MIT License
 # Project home: https://github.com/danny0838/git-store-meta
@@ -49,7 +49,7 @@
 use utf8;
 use strict;
 
-use version; our $VERSION = version->declare("v1.3.3");
+use version; our $VERSION = version->declare("v2.0.0_001");
 use Getopt::Long;
 Getopt::Long::Configure qw(gnu_getopt);
 use Cwd;
@@ -305,9 +305,27 @@ sub get_cache_header_info {
     $cache_header_valid = 1;
 }
 
+# @global $git_store_meta_file
+sub has_directory_entry {
+    open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
+    my $count = 0;
+    while (my $line = <GIT_STORE_META_FILE>) {
+        if (++$count <= 2) { next; }  # discard first 2 lines
+        $line =~ s/^\s+//; $line =~ s/\s+$//;
+        next if $line eq "";
+
+        # for each line, parse the record
+        if ((split("\t", $line))[1] eq "d") {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 # @global $argv
 # @global $action
 # @global $cache_header_valid
+# @global $cache_version
 sub get_fields {
     my %fields_used = (
         "file"  => 0,
@@ -324,16 +342,19 @@ sub get_fields {
     );
 
     # use $argv{'fields'} if defined, or use fields in the cache file
+    # special handling for --update, which must use fields in the cache file
     my @parts;
-    if ($action eq "update") {
-        # special handling for --update, which must use fields in the cache file
-        @parts = @cache_fields;
-    }
-    elsif ($argv{'fields'}) {
+    if ($argv{'fields'} && $action ne "update") {
         push(@parts, ("file", "type"), split(/,\s*/, $argv{'fields'}));
     }
     elsif ($cache_header_valid) {
         @parts = @cache_fields;
+
+        # Versions < 2 use --directory rather than --field directory
+        # Add "directory" field if a directory entry exists.
+        if ($cache_version < 2 && !grep { $_ eq "directory" } @parts) {
+            if (has_directory_entry()) { push(@parts, "directory"); }
+        }
     }
     else {
         @parts = ("file", "type", "mtime");
@@ -564,9 +585,9 @@ sub apply {
     my @fields = @_;
     my %fields_used = map { $_ => 1 } @fields;
 
-    # v1.0.0 ~ v1.3.* share same apply procedure
+    # v1.0.0 ~ v2.0.* share same apply procedure
     # (files with a bad file name recorded in 1.0.* will be skipped)
-    if (1.0.0 <= $cache_version && $cache_version < 1.4.0) {
+    if (1.0.0 <= $cache_version && $cache_version < 2.1.0) {
         my $count = 0;
         open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
         while (my $line = <GIT_STORE_META_FILE>) {
@@ -818,7 +839,7 @@ sub main {
         if ($cache_app ne $GIT_STORE_META_APP) {
             die "error: `$git_store_meta_file' is using an unknown schema: $cache_app $cache_version\nFix it or run --store to create new.\n";
         }
-        if (!(1.1.0 <= $cache_version && $cache_version < 1.4.0)) {
+        if (!(1.1.0 <= $cache_version && $cache_version < 2.1.0)) {
             die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
         }
 
