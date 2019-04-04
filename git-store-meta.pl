@@ -669,7 +669,7 @@ sub apply {
         close(GIT_STORE_META_FILE);
     }
     else {
-        die "error: current cache is using an unsupported version: $version\n";
+        die "error: `$git_store_meta_file' is using an unsupported version: $version\n";
     }
 }
 
@@ -791,7 +791,7 @@ sub main {
             die "error: `$git_store_meta_file' is using an unknown schema: $app $version\nFix it or run --store to create new.\n";
         }
         if (!(1.1.0 <= $version && $version < 1.4.0)) {
-            die "error: current cache is using an unsupported version: $version\n";
+            die "error: `$git_store_meta_file' is using an unsupported version: $version\n";
         }
         # do the update
         print $field_info;
@@ -828,7 +828,7 @@ sub main {
             exit;
         }
         if (!$argv{'force'} && `$GIT status --porcelain -uno -z 2>/dev/null` ne "") {
-          die "error: git working tree is not clean.\nCommit, stach, or revert changes before running this, or use --force.\n";
+          die "error: git working tree is not clean.\nCommit, stach, or revert changes before running this, or add --force.\n";
         }
         if (!$cache_file_accessible) {
             die "error: unable to access `$git_store_meta_file'.\n";
