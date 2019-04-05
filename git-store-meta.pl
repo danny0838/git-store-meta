@@ -75,6 +75,13 @@ my $git_store_meta_file;
 my $git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, substr($VERSION, 1)) . "\n";
 my $script = rel2abs(__FILE__);
 my $temp_file;
+my $action;
+my $cache_file_exist = 0;
+my $cache_file_accessible = 0;
+my $cache_header_valid = 0;
+my $cache_app;
+my $cache_version;
+my @cache_fields;
 
 # parse arguments
 my %argv = (
@@ -263,49 +270,50 @@ EOF
 }
 
 # return the header and fields info of a file
+#
+# @global $git_store_meta_file
+# @global $cache_file_exist
+# @global $cache_file_accessible
+# @global $cache_header_valid
+# @global $cache_app
+# @global $cache_version
+# @global $cache_fields
 sub get_cache_header_info {
-    my ($file) = @_;
+    -f $git_store_meta_file || return;
+    $cache_file_exist = 1;
 
-    my $cache_file_exist = 0;
-    my $cache_file_accessible = 0;
-    my $cache_header_valid = 0;
-    my $app = "<?app?>";
-    my $version = "<?version?>";
-    my @fields;
-    check: {
-        -f $file || last;
-        $cache_file_exist = 1;
-        open(GIT_STORE_META_FILE, "<", $git_store_meta_file) || last check;
-        $cache_file_accessible = 1;
-        # first line: retrieve the header
-        my $line = <GIT_STORE_META_FILE>;
-        $line || last check;
-        chomp($line);
-        my @parts = split("\t", $line);
-        $parts[0] eq $GIT_STORE_META_PREFIX || last check;
-        $app = $parts[1];
-        eval { $version = version->parse("v" . $parts[2]); } or do { last check; };
-        # seconds line: retrieve the fields
-        $line = <GIT_STORE_META_FILE>;
-        $line || last check;
-        chomp($line);
-        @parts = split("\t", $line);
-        for (my $i=0; $i<=$#parts; $i++) {
-            $parts[$i] =~ m!^<(.*)>$! && push(@fields, $1) || last check;
-        }
-        (grep { $_ eq 'file' } @fields) || last check;
-        (grep { $_ eq 'type' } @fields) || last check;
-        close(GIT_STORE_META_FILE);
-        $cache_header_valid = 1;
-    };
-    return ($cache_file_exist, $cache_file_accessible, $cache_header_valid, $app, $version, \@fields);
+    open(GIT_STORE_META_FILE, "<", $git_store_meta_file) || return;
+    $cache_file_accessible = 1;
+
+    # first line: retrieve the header
+    my $line = <GIT_STORE_META_FILE>;
+    $line || return;
+    chomp($line);
+    my @parts = split("\t", $line);
+    $parts[0] eq $GIT_STORE_META_PREFIX || return;
+    $cache_app = $parts[1];
+    eval { $cache_version = version->parse("v" . $parts[2]); } || return;
+
+    # second line: retrieve the fields
+    $line = <GIT_STORE_META_FILE>;
+    $line || return;
+    chomp($line);
+    foreach (split("\t", $line)) {
+        m!^<(.*)>$! && push(@cache_fields, $1) || return;
+    }
+
+    # check for existence of "file" and "type" fields
+    (grep { $_ eq 'file' } @cache_fields) || return;
+    (grep { $_ eq 'type' } @cache_fields) || return;
+
+    close(GIT_STORE_META_FILE);
+    $cache_header_valid = 1;
 }
 
+# @global $argv
+# @global $action
+# @global $cache_header_valid
 sub get_fields {
-    my ($action, $cache_header_valid, $cache_fields) = @_;
-    my @cache_fields = @{$cache_fields};
-
-    # parse field list
     my %fields_used = (
         "file"  => 0,
         "type"  => 0,
@@ -337,14 +345,14 @@ sub get_fields {
 
     # remove undefined and/or duplicated fields
     my @fields;
-    for (my $i=0; $i<=$#parts; $i++) {
-        if (exists($fields_used{$parts[$i]}) && !$fields_used{$parts[$i]}) {
-            $fields_used{$parts[$i]} = 1;
-            push(@fields, $parts[$i]);
+    foreach (@parts) {
+        if (exists($fields_used{$_}) && !$fields_used{$_}) {
+            $fields_used{$_} = 1;
+            push(@fields, $_);
         }
     }
 
-    return (\%fields_used, \@fields);
+    return @fields;
 }
 
 sub get_file_metadata {
@@ -376,15 +384,14 @@ sub get_file_metadata {
         "acl"   => $acl,
     );
     # output formatted data
-    for (my $i=0; $i<=$#fields; $i++) {
-        push(@rec, defined $data{$fields[$i]} ? $data{$fields[$i]} : "");
+    foreach (@fields) {
+        push(@rec, defined($data{$_}) ? $data{$_} : "");
     }
     return @rec;
 }
 
 sub store {
-    my ($fields) = @_;
-    my @fields = @{$fields};
+    my @fields = @_;
 
     # read the file list and write retrieved metadata to a temp file
     open(TEMP_FILE, ">", $temp_file) or die;
@@ -423,8 +430,7 @@ sub store {
 }
 
 sub update {
-    my ($fields) = @_;
-    my @fields = @{$fields};
+    my @fields = @_;
 
     # append new entries to the temp file
     open(TEMP_FILE, ">>", $temp_file) or die;
@@ -553,14 +559,15 @@ sub update {
     close(CMD);
 }
 
+# @global @cache_fields
+# @global $cache_version
 sub apply {
-    my ($fields_used, $cache_fields, $version) = @_;
-    my %fields_used = %{$fields_used};
-    my @cache_fields = @{$cache_fields};
+    my @fields = @_;
+    my %fields_used = map { $_ => 1 } @fields;
 
     # v1.0.0 ~ v1.3.* share same apply procedure
     # (files with a bad file name recorded in 1.0.* will be skipped)
-    if (1.0.0 <= $version && $version < 1.4.0) {
+    if (1.0.0 <= $cache_version && $cache_version < 1.4.0) {
         my $count = 0;
         open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
         while (my $line = <GIT_STORE_META_FILE>) {
@@ -726,7 +733,7 @@ sub apply {
         close(GIT_STORE_META_FILE);
     }
     else {
-        die "error: `$git_store_meta_file' is using an unsupported version: $version\n";
+        die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
     }
 }
 
@@ -735,11 +742,14 @@ sub apply {
 sub main {
     # determine action
     # priority: help > install > update > store > action if multiple assigned
-    my $action = "";
     for ('help', 'install', 'update', 'store', 'apply') { if ($argv{$_}) { $action = $_; last; } }
 
     # handle action: help, install, and unknown
-    if ($action eq "help") {
+    if (!defined($action)) {
+        usage();
+        exit 1;
+    }
+    elsif ($action eq "help") {
         usage();
         exit 0;
     }
@@ -747,10 +757,6 @@ sub main {
         print "installing hooks...\n";
         install_hooks();
         exit 0;
-    }
-    elsif ($action eq "") {
-        usage();
-        exit 1;
     }
 
     # validate gitdir and topdir
@@ -775,28 +781,26 @@ sub main {
     $temp_file = $git_store_meta_file . ".tmp" . time;
 
     # parse header
-    my ($cache_file_exist, $cache_file_accessible, $cache_header_valid, $app, $version, $cache_fields) = get_cache_header_info($git_store_meta_file);
-    my @cache_fields = @{$cache_fields};
+    get_cache_header_info();
 
     # handle action: store, update, apply
     if ($action eq "store") {
         print "storing metadata to `$git_store_meta_file' ...\n";
 
         # get and show fields
-        my ($fields_used, $fields) = get_fields($action, $cache_header_valid, \@cache_fields);
-        my @fields = @{$fields};
+        my @fields = get_fields();
         print "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
 
         # do the store
         if (!$argv{'dry-run'}) {
             open(GIT_STORE_META_FILE, '>', $git_store_meta_file) or die;
             select(GIT_STORE_META_FILE);
-            store(\@fields);
+            store(@fields);
             close(GIT_STORE_META_FILE);
             select(STDOUT);
         }
         else {
-            store(\@fields);
+            store(@fields);
         }
     }
     elsif ($action eq "update") {
@@ -812,16 +816,15 @@ sub main {
         if (!$cache_header_valid) {
             die "error: `$git_store_meta_file' is malformatted.\nFix it or run --store to create new.\n";
         }
-        if ($app ne $GIT_STORE_META_APP) {
-            die "error: `$git_store_meta_file' is using an unknown schema: $app $version\nFix it or run --store to create new.\n";
+        if ($cache_app ne $GIT_STORE_META_APP) {
+            die "error: `$git_store_meta_file' is using an unknown schema: $cache_app $cache_version\nFix it or run --store to create new.\n";
         }
-        if (!(1.1.0 <= $version && $version < 1.4.0)) {
-            die "error: `$git_store_meta_file' is using an unsupported version: $version\n";
+        if (!(1.1.0 <= $cache_version && $cache_version < 1.4.0)) {
+            die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
         }
 
         # get and show fields
-        my ($fields_used, $fields) = get_fields($action, $cache_header_valid, \@cache_fields);
-        my @fields = @{$fields};
+        my @fields = get_fields();
         print "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
 
         # do the update
@@ -842,12 +845,12 @@ sub main {
         if (!$argv{'dry-run'}) {
             open(GIT_STORE_META_FILE, '>', $git_store_meta_file) or die;
             select(GIT_STORE_META_FILE);
-            update(\@fields);
+            update(@fields);
             close(GIT_STORE_META_FILE);
             select(STDOUT);
         }
         else {
-            update(\@fields);
+            update(@fields);
         }
 
         # clean up
@@ -870,17 +873,16 @@ sub main {
         if (!$cache_header_valid) {
             die "error: `$git_store_meta_file' is malformatted.\n";
         }
-        if ($app ne $GIT_STORE_META_APP) {
-            die "error: `$git_store_meta_file' is using an unknown schema: $app $version\n";
+        if ($cache_app ne $GIT_STORE_META_APP) {
+            die "error: `$git_store_meta_file' is using an unknown schema: $cache_app $cache_version\n";
         }
 
         # get and show fields
-        my ($fields_used, $fields) = get_fields($action, $cache_header_valid, \@cache_fields);
-        my @fields = @{$fields};
+        my @fields = get_fields();
         print "fields: " . join(", ", @fields) . "; directory: " . ($argv{'directory'} ? "yes" : "no") . "\n";
 
         # do the apply
-        apply($fields_used, \@cache_fields, $version);
+        apply(@fields);
     }
 }
 
