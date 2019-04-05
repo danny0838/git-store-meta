@@ -115,11 +115,11 @@ added, deleted, or renamed files) are also updated:
 
     git-store-meta.pl --update -d
 
-Note that files or directories whose metadata have been changed without any
-content (or modes Git cares) change will not be awared, and a `--store` is
-required if you want to record these metadata changes. Though, conversely,
-this avoids unintentional metadata changes from being added, and could be
-preferrable in some cases.
+Note that files or directories not considered changed by Git are not updated,
+even if their metadata have been changed, and a `--store` is required to record
+their metadata changes in such cases. Though, conversely, this avoids
+unintentional metadata changes from being included, and could be preferrable in
+many cases.
 
 ### Install
 
