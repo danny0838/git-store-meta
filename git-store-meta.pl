@@ -5,29 +5,29 @@
 # Store, update, or apply metadata for files revisioned by Git.
 #
 # ACTION is one of:
-#   -s, --store        Store the metadata for all files revisioned by Git.
-#   -u, --update       Update the metadata for changed files.
-#   -a, --apply        Apply the stored metadata to files in the working tree.
-#   -i, --install      Install hooks in this repo for automated update/apply.
+#   -s|--store         Store the metadata for all files revisioned by Git.
+#   -u|--update        Update the metadata for changed files.
+#   -a|--apply         Apply the stored metadata to files in the working tree.
+#   -i|--install       Install hooks in this repo for automated update/apply.
 #                      (pre-commit, post-checkout, and post-merge)
-#   -h, --help         Print this help and exit.
+#   -h|--help          Print this help and exit.
 #
 # Available OPTIONs are:
-#   -f, --field FIELDs Fields to store or apply (see below). If omitted, all
-#                      fields in the current metadata store file are picked if
-#                      it exists; otherwise, "mtime" is picked.
+#   -f|--fields FIELDs Fields to handle (see below). If omitted, fields in the
+#                      current metadata store file are picked if possible;
+#                      otherwise, "mtime" is picked as the default.
 #                      (available for: --store, --apply)
-#   -d, --directory    Also store, update, or apply for directories. Or
+#   -d|--directory     Also store, update, or apply for directories. Or
 #                      install hooks that work for directories.
 #                      (available for: --store, --update, --apply, --install)
-#   -n, --dry-run      Run a test and print the output, without real action.
+#   -n|--dry-run       Run a test and print the output, without real action.
 #                      (available for: --store, --update, --apply)
-#   -v, --verbose      Apply with verbose output.
+#   -v|--verbose       Apply with verbose output.
 #                      (available for: --apply)
 #   --force            Force an apply even if the working tree is not clean. Or
 #                      install hooks and overwrite existing ones.
 #                      (available for: --apply, --install)
-#   -t, --target FILE  Specify another filename to store metadata. Defaults to
+#   -t|--target FILE   Specify another filename to store metadata. Defaults to
 #                      ".git_store_meta" in the root of the working tree.
 #                      (available for: --store, --update, --apply, --install)
 #
@@ -91,7 +91,7 @@ my %argv = (
     "install"    => 0,
     "help"       => 0,
     "target"     => "",
-    "field"      => "",
+    "fields"     => "",
     "directory"  => 0,
     "force"      => 0,
     "dry-run"    => 0,
@@ -103,7 +103,7 @@ GetOptions(
     "apply|a",      \$argv{'apply'},
     "install|i",    \$argv{'install'},
     "help|h",       \$argv{'help'},
-    "field|f=s",    \$argv{'field'},
+    "fields|f=s",   \$argv{'fields'},
     "directory|d",  \$argv{'directory'},
     "force",        \$argv{'force'},
     "dry-run|n",    \$argv{'dry-run'},
@@ -327,14 +327,14 @@ sub get_fields {
         "acl"   => 0,
     );
 
-    # use $argv{'field'} if defined, or use fields in the cache file
+    # use $argv{'fields'} if defined, or use fields in the cache file
     my @parts;
     if ($action eq "update") {
         # special handling for --update, which must use fields in the cache file
         @parts = @cache_fields;
     }
-    elsif ($argv{'field'}) {
-        push(@parts, ("file", "type"), split(/,\s*/, $argv{'field'}));
+    elsif ($argv{'fields'}) {
+        push(@parts, ("file", "type"), split(/,\s*/, $argv{'fields'}));
     }
     elsif ($cache_header_valid) {
         @parts = @cache_fields;

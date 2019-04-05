@@ -56,14 +56,14 @@ To store the metadata of all git-revisioned files, run:
 And a data file named `.git_store_meta` (by default) will be created in your
 repo, `git add` it so that the metadata is revisioned.
 
-The `--field` (`-f`) option determines which fields are to be stored. Their
+The `--fields` (`-f`) option determines which fields are to be stored. Their
 order matters partially since it affects the order of fields in the data
 file, but it doesn't affect applying. For example the above command creates
 a data file with these fields:
 
     <file> <type> <user> <group> <mode> <mtime> <atime>
 
-If `--field` is not provided, git-store-meta takes the fields defined in the
+If `--fields` is not provided, git-store-meta takes the fields defined in the
 current data file, and thus running `git-store-meta.pl --store` works in most
 usual cases.
 
