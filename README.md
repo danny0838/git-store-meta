@@ -139,7 +139,8 @@ are also handled:
 
 Note that the installation is skipped to avoid a dangerous overwrite if there
 are existing hooks. In this case you can rename the existing hook files, run
-the installation again, and merge the hook contents manually.
+the installation again, and merge the hook contents manually. The `--force`
+option can be added to overwrite existing hooks if desired.
 
 Note that since Git doesn't provide a "post-reset" hook, git-store-meta doesn't
 run after a successful `git reset --hard`. To restore file metadata after a

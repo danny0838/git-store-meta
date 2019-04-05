@@ -24,8 +24,9 @@
 #                      (available for: --store, --update, --apply)
 #   -v, --verbose      Apply with verbose output.
 #                      (available for: --apply)
-#   --force            Force an apply even if the working tree is not clean.
-#                      (available for: --apply)
+#   --force            Force an apply even if the working tree is not clean. Or
+#                      install hooks and overwrite existing ones.
+#                      (available for: --apply, --install)
 #   -t, --target FILE  Specify another filename to store metadata. Defaults to
 #                      ".git_store_meta" in the root of the working tree.
 #                      (available for: --store, --update, --apply, --install)
@@ -180,14 +181,16 @@ sub install_hooks {
     print "git directory: `$gitdir'\n";
 
     # Ensure the hook files don't already exist
-    my $err = '';
-    foreach my $n ("pre-commit", "post-checkout", "post-merge") {
-        my $f = "$gitdir/hooks/$n";
-        if (-e "$f") {
-            $err .= "error: hook file `$f' already exists.\n";
+    if (!$argv{'force'}) {
+        my $err = '';
+        foreach my $n ("pre-commit", "post-checkout", "post-merge") {
+            my $f = "$gitdir/hooks/$n";
+            if (-e "$f") {
+                $err .= "error: hook file `$f' already exists.\n";
+            }
         }
+        if ($err) { die $err . "Add --force to overwrite current hook files.\n"; }
     }
-    if ($err) { die $err; }
 
     # Install the hooks
     my $t;
