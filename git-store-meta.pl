@@ -180,12 +180,14 @@ sub install_hooks {
     print "git directory: `$gitdir'\n";
 
     # Ensure the hook files don't already exist
+    my $err = '';
     foreach my $n ("pre-commit", "post-checkout", "post-merge") {
         my $f = "$gitdir/hooks/$n";
         if (-e "$f") {
-            die "error: hook file `$f' already exists.\n";
+            $err .= "error: hook file `$f' already exists.\n";
         }
     }
+    if ($err) { die $err; }
 
     # Install the hooks
     my $t;
