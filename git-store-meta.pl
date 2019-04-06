@@ -16,7 +16,7 @@
 #   -f|--fields FIELDs Fields to handle (see below). If omitted, fields in the
 #                      current metadata store file are picked if possible;
 #                      otherwise, "mtime" is picked as the default.
-#                      (available for: --store, --apply)
+#                      (available for: --store, --apply, --install)
 #   -n|--dry-run       Run a test and print the output, without real action.
 #                      (available for: --store, --update, --apply)
 #   -v|--verbose       Apply with verbose output.
@@ -177,6 +177,9 @@ sub usage {
 
 # Install hooks
 sub install_hooks {
+    my @fields = @_;
+    my %fields_used = map { $_ => 1 } @fields;
+
     # validate gitdir
     if (!defined($gitdir)) {
         die "error: unknown git repository.\n";
@@ -199,10 +202,11 @@ sub install_hooks {
     my $t;
     my $f = ($argv{'target'} ne "") ? " -t " . escapeshellarg($argv{'target'}) : "";
     my $f2 = escapeshellarg(($argv{'target'} ne "") ? $argv{'target'} : $GIT_STORE_META_FILENAME);
+    my $fo = ($argv{'fields'} ne "") ? " -f " . join(",", @fields) : "";
 
     $t = "$gitdir/hooks/pre-commit";
     open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
-    printf FILE <<'EOF', $f, $f, $f2;
+    printf FILE <<'EOF', $f, $fo, $f, $f2;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
@@ -211,7 +215,7 @@ script=$(dirname "$0")/git-store-meta.pl
 
 # update (or store as fallback)
 "$script" --update%s ||
-"$script" --store%s ||
+"$script" --store%s%s ||
 exit 1
 
 # remember to add the updated cache file
@@ -781,7 +785,12 @@ sub main {
     }
     elsif ($action eq "install") {
         print "installing hooks...\n";
-        install_hooks();
+
+	# get and show fields (from command line or default)
+        my @fields = get_fields();
+        print "fields: " . join(", ", @fields) . "\n";
+
+        install_hooks(@fields);
         exit 0;
     }
 

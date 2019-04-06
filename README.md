@@ -128,6 +128,10 @@ to generate `pre-commit`, `post-checkout`, and `post-merge` hooks for the
 current Git repo. Of course you can modify the hooks afterwards to fit your
 needs better.
 
+You can use the `--fields` option together with `--install` to define which
+fields the pre-commit hook shall record when it creates a data file from
+scratch.
+
 Note that the installation is skipped to avoid a dangerous overwrite if there
 are existing hooks. In this case you can rename the existing hook files, run
 the installation again, and merge the hook contents manually. The `--force`
