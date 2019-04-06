@@ -406,7 +406,7 @@ sub get_file_metadata {
         "user"  => $user,
         "group" => $group,
         "acl"   => $acl,
-        "directory"   => "",
+        "directory"   => ".",
     );
     # output formatted data
     foreach (@fields) {
