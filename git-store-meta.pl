@@ -222,7 +222,8 @@ exit 1
 git add %s
 EOF
     close(FILE);
-    chmod(0755, $t) == 1 || die "error: failed to set permissions on '$t': $!\n";
+    chmod(0777&~umask, $t) == 1
+	|| die "error: failed to set permissions on '$t': $!\n";
     print "created `$t'\n";
 
     $t = "$gitdir/hooks/post-checkout";
@@ -244,7 +245,8 @@ if [ ${sha_new} != ${sha_old} ]; then
 fi
 EOF
     close(FILE);
-    chmod(0755, $t) == 1 || die "error: failed to set permissions on '$t': $!\n";
+    chmod(0777&~umask, $t) == 1
+	|| die "error: failed to set permissions on '$t': $!\n";
     print "created `$t'\n";
 
     $t = "$gitdir/hooks/post-merge";
@@ -264,7 +266,8 @@ if [ $is_squash -eq 0 ]; then
 fi
 EOF
     close(FILE);
-    chmod(0755, $t) == 1 || die "error: failed to set permissions on '$t': $!\n";
+    chmod(0777&~umask, $t) == 1
+	|| die "error: failed to set permissions on '$t': $!\n";
     print "created `$t'\n";
 }
 
