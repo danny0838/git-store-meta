@@ -114,7 +114,7 @@ revisioned ones:
 Note that files or directories not considered changed by Git are not updated,
 even if their metadata have been changed, and a `--store` is required to record
 their metadata changes in such cases. Though, conversely, this avoids
-unintentional metadata changes from being included, and could be preferrable in
+unintentional metadata changes from being included, and could be preferable in
 many cases.
 
 ### Install
