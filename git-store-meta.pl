@@ -885,7 +885,7 @@ sub main {
             exit;
         }
         if (!$argv{'force'} && `$GIT status --porcelain -uno -z 2>/dev/null` ne "") {
-          die "error: git working tree is not clean.\nCommit, stach, or revert changes before running this, or add --force.\n";
+          die "error: git working tree is not clean.\nCommit, stash, or revert changes before running this, or add --force.\n";
         }
         if (!$cache_file_accessible) {
             die "error: unable to access `$git_store_meta_file'.\n";
