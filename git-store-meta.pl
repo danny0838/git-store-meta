@@ -426,6 +426,8 @@ sub store {
         }
         close(CMD);
         if ($fields_used{'directory'}) {
+	    my $s = join("\t", get_file_metadata(".", \@fields));  # Topdir.
+	    print TEMP_FILE "$s\n" if $s;
             open(CMD, "$GIT ls-tree -rd --name-only -z \$($GIT write-tree) |") or die;
             while(<CMD>) {
                 chomp;
@@ -517,6 +519,10 @@ sub update {
                 print TEMP_FILE escape_filename($file)."\0\2M\0\n";
             }
         }
+	# always update topdir when gathering directory data
+	if ($fields_used{'directory'}) {
+	    print TEMP_FILE ".\0\2M\0\n";
+	}
     }
     close(TEMP_FILE);
 
