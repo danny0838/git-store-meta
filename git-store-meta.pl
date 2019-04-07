@@ -352,7 +352,7 @@ sub get_fields {
 
         # Versions < 2 use --directory rather than --field directory
         # Add "directory" field if a directory entry exists.
-        if ($cache_version < 2 && !grep { $_ eq "directory" } @parts) {
+        if ($cache_version < 2) {
             if (has_directory_entry()) { push(@parts, "directory"); }
         }
     }
