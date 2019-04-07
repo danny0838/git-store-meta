@@ -204,20 +204,22 @@ sub install_hooks {
 
     $t = "$gitdir/hooks/pre-commit";
     open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
-    printf FILE <<'EOF', $f, $f, $f2;
+    printf FILE <<'EOF', $f2, $f, $f, $f2;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
 script=$(dirname "$0")/git-store-meta.pl
 [ ! -x "$script" ] && script=git-store-meta.pl
 
-# update (or store as fallback)
-"$script" --update%s ||
-"$script" --store%s ||
-exit 1
+# update (or store as fallback) the cache file if it exists
+if [ -f %s ]; then
+    "$script" --update%s ||
+    "$script" --store%s ||
+    exit 1
 
-# remember to add the updated cache file
-git add %s
+    # remember to add the updated cache file
+    git add %s
+fi
 EOF
     close(FILE);
     chmod($mode, $t) == 1 || die "error: failed to set permissions on '$t': $!\n";
