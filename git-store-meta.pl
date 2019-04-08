@@ -95,16 +95,16 @@ my %argv = (
     "verbose"    => 0,
 );
 GetOptions(
-    "store|s",      \$argv{'store'},
-    "update|u",     \$argv{'update'},
-    "apply|a",      \$argv{'apply'},
-    "install|i",    \$argv{'install'},
-    "help|h",       \$argv{'help'},
-    "fields|f=s",   \$argv{'fields'},
-    "force",        \$argv{'force'},
-    "dry-run|n",    \$argv{'dry-run'},
-    "verbose|v",    \$argv{'verbose'},
-    "target|t=s",   \$argv{'target'},
+    "store|s"    => \$argv{'store'},
+    "update|u"   => \$argv{'update'},
+    "apply|a"    => \$argv{'apply'},
+    "install|i"  => \$argv{'install'},
+    "help|h"     => \$argv{'help'},
+    "fields|f=s" => \$argv{'fields'},
+    "force"      => \$argv{'force'},
+    "dry-run|n"  => \$argv{'dry-run'},
+    "verbose|v"  => \$argv{'verbose'},
+    "target|t=s" => \$argv{'target'},
 );
 
 # -----------------------------------------------------------------------------
