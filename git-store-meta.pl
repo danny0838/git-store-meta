@@ -273,10 +273,10 @@ EOF
 # @global $cache_version
 # @global $cache_fields
 sub get_cache_header_info {
-    -f $git_store_meta_file or return;
+    -e $git_store_meta_file or return;
     $cache_file_exist = 1;
 
-    open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or return;
+    -f $git_store_meta_file and open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or return;
     $cache_file_accessible = 1;
 
     # first line: retrieve the header
@@ -817,7 +817,7 @@ sub main {
             die "error: `$git_store_meta_file' doesn't exist.\nRun --store to create new.\n";
         }
         if (!$cache_file_accessible) {
-            die "error: unable to access `$git_store_meta_file'.\n";
+            die "error: `$git_store_meta_file' is not an accessible file.\n";
         }
         if (!$cache_header_valid) {
             die "error: `$git_store_meta_file' is malformatted.\nFix it or run --store to create new.\n";
@@ -840,7 +840,7 @@ sub main {
           die "error: git working tree is not clean.\nCommit, stash, or revert changes before running this, or add --force.\n";
         }
         if (!$cache_file_accessible) {
-            die "error: unable to access `$git_store_meta_file'.\n";
+            die "error: `$git_store_meta_file' is not an accessible file.\n";
         }
         if (!$cache_header_valid) {
             die "error: `$git_store_meta_file' is malformatted.\n";
