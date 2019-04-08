@@ -216,7 +216,7 @@ if [ -f %s ]; then
 fi
 EOF
     close(FILE);
-    chmod($mode, $t) == 1 || die "error: failed to set permissions on `$t': $!\n";
+    chmod($mode, $t) == 1 or die "error: failed to set permissions on `$t': $!\n";
     print "created `$t'\n";
 
     $t = "$gitdir/hooks/post-checkout";
@@ -238,7 +238,7 @@ if [ ${sha_new} != ${sha_old} ]; then
 fi
 EOF
     close(FILE);
-    chmod($mode, $t) == 1 || die "error: failed to set permissions on `$t': $!\n";
+    chmod($mode, $t) == 1 or die "error: failed to set permissions on `$t': $!\n";
     print "created `$t'\n";
 
     $t = "$gitdir/hooks/post-merge";
@@ -258,7 +258,7 @@ if [ $is_squash -eq 0 ]; then
 fi
 EOF
     close(FILE);
-    chmod($mode, $t) == 1 || die "error: failed to set permissions on `$t': $!\n";
+    chmod($mode, $t) == 1 or die "error: failed to set permissions on `$t': $!\n";
     print "created `$t'\n";
 }
 
@@ -272,32 +272,32 @@ EOF
 # @global $cache_version
 # @global $cache_fields
 sub get_cache_header_info {
-    -f $git_store_meta_file || return;
+    -f $git_store_meta_file or return;
     $cache_file_exist = 1;
 
-    open(GIT_STORE_META_FILE, "<", $git_store_meta_file) || return;
+    open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or return;
     $cache_file_accessible = 1;
 
     # first line: retrieve the header
     my $line = <GIT_STORE_META_FILE>;
-    $line || return;
+    $line or return;
     chomp($line);
     my ($prefix, $app, $version) = split("\t", $line);
-    $prefix eq $GIT_STORE_META_PREFIX || return;
+    $prefix eq $GIT_STORE_META_PREFIX or return;
     $cache_app = $app;
-    eval { $cache_version = version->parse("v" . $version); } || return;
+    eval { $cache_version = version->parse("v" . $version); } or return;
 
     # second line: retrieve the fields
     $line = <GIT_STORE_META_FILE>;
-    $line || return;
+    $line or return;
     chomp($line);
     foreach (split("\t", $line)) {
-        m!^<(.*)>$! && push(@cache_fields, $1) || return;
+        m!^<(.*)>$! and push(@cache_fields, $1) or return;
     }
 
     # check for existence of "file" and "type" fields
-    (grep { $_ eq 'file' } @cache_fields) || return;
-    (grep { $_ eq 'type' } @cache_fields) || return;
+    grep { $_ eq 'file' } @cache_fields or return;
+    grep { $_ eq 'type' } @cache_fields or return;
 
     close(GIT_STORE_META_FILE);
     $cache_header_valid = 1;
@@ -773,8 +773,8 @@ sub main {
     }
 
     # init and validate gitdir
-    $gitdir = `$GIT rev-parse --git-dir 2>/dev/null` || 
-        die "error: unknown git repository.\n";
+    $gitdir = `$GIT rev-parse --git-dir 2>/dev/null`
+        or die "error: unknown git repository.\n";
     chomp($gitdir);
 
     # handle action: install
@@ -785,8 +785,8 @@ sub main {
     }
 
     # init and validate topdir
-    $topdir = `$GIT rev-parse --show-cdup 2>/dev/null` || 
-        die "error: current working directory is not in a git working tree.\n";
+    $topdir = `$GIT rev-parse --show-cdup 2>/dev/null`
+        or die "error: current working directory is not in a git working tree.\n";
     chomp($topdir);
 
     # record the original CWD before change
