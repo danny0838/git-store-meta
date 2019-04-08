@@ -161,7 +161,8 @@ sub unescape_filename {
 # with "# " removed
 sub usage {
     my $start = 0;
-    open(GIT_STORE_META, "<", $script) or die;
+    open(GIT_STORE_META, "<", $script)
+        or die "error: failed to access `$script': $!\n";
     while (my $line = <GIT_STORE_META>) {
         if ($line =~ m!^# ={2,}!) {
             if (!$start) { $start = 1; next; }
@@ -859,7 +860,8 @@ sub main {
     # do the action
     if ($action eq "store") {
         if (!$argv{'dry-run'}) {
-            open(GIT_STORE_META_FILE, '>', $git_store_meta_file) or die;
+            open(GIT_STORE_META_FILE, '>', $git_store_meta_file)
+                or die "error: failed to write to `$git_store_meta_file': $!\n";
             select(GIT_STORE_META_FILE);
             store(@fields);
             close(GIT_STORE_META_FILE);
@@ -872,7 +874,8 @@ sub main {
     elsif ($action eq "update") {
         # copy the cache file to the temp file
         # to prevent a conflict in further operation
-        open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
+        open(GIT_STORE_META_FILE, "<", $git_store_meta_file)
+            or die "error: failed to access `$git_store_meta_file': $!\n";
         open(TEMP_FILE, ">", $temp_file) or die;
         my $count = 0;
         while (<GIT_STORE_META_FILE>) {
@@ -884,7 +887,8 @@ sub main {
 
         # update cache
         if (!$argv{'dry-run'}) {
-            open(GIT_STORE_META_FILE, '>', $git_store_meta_file) or die;
+            open(GIT_STORE_META_FILE, '>', $git_store_meta_file)
+                or die "error: failed to write to `$git_store_meta_file': $!\n";
             select(GIT_STORE_META_FILE);
             update(@fields);
             close(GIT_STORE_META_FILE);
