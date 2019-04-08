@@ -88,8 +88,8 @@ my %argv = (
     "apply"      => 0,
     "install"    => 0,
     "help"       => 0,
-    "target"     => "",
-    "fields"     => "",
+    "target"     => undef,
+    "fields"     => undef,
     "force"      => 0,
     "dry-run"    => 0,
     "verbose"    => 0,
@@ -193,8 +193,8 @@ sub install_hooks {
     my $mask = umask; if (!defined($mask)) { $mask = 0022; }
     my $mode = 0777 & ~$mask;
     my $t;
-    my $f = ($argv{'target'} ne "") ? " -t " . escapeshellarg($argv{'target'}) : "";
-    my $f2 = escapeshellarg(($argv{'target'} ne "") ? $argv{'target'} : $GIT_STORE_META_FILENAME);
+    my $f = defined($argv{'target'}) ? " -t " . escapeshellarg($argv{'target'}) : "";
+    my $f2 = escapeshellarg(defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME);
 
     $t = "$gitdir/hooks/pre-commit";
     open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
@@ -342,7 +342,7 @@ sub get_fields {
     # use $argv{'fields'} if defined, or use fields in the cache file
     # special handling for --update, which must use fields in the cache file
     my @parts;
-    if ($argv{'fields'} && $action ne "update") {
+    if (defined($argv{'fields'}) && $action ne "update") {
         push(@parts, ("file", "type"), split(/,\s*/, $argv{'fields'}));
     }
     elsif ($cache_header_valid) {
@@ -798,7 +798,7 @@ sub main {
     }
 
     # init paths and header info
-    $git_store_meta_filename = ($argv{'target'} ne "") ? $argv{'target'} : $GIT_STORE_META_FILENAME;
+    $git_store_meta_filename = defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME;
     $git_store_meta_file = rel2abs($git_store_meta_filename);
     $temp_file = $git_store_meta_file . ".tmp" . time;
     get_cache_header_info();
