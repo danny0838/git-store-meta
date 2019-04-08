@@ -39,7 +39,7 @@
 #   acl        access control lists for POSIX setfacl/getfacl
 #   directory  include directories
 #
-# git-store-meta 2.0.0_002
+# git-store-meta 2.0.0_003
 # Copyright (c) 2015-2019, Danny Lin
 # Released under MIT License
 # Project home: https://github.com/danny0838/git-store-meta
@@ -49,7 +49,7 @@
 use utf8;
 use strict;
 
-use version; our $VERSION = version->declare("v2.0.0_002");
+use version; our $VERSION = version->declare("v2.0.0_003");
 use Getopt::Long;
 Getopt::Long::Configure qw(gnu_getopt);
 use Cwd;
