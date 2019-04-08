@@ -197,7 +197,7 @@ sub install_hooks {
     my $f2 = escapeshellarg(defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME);
 
     $t = "$gitdir/hooks/pre-commit";
-    open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
+    open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
     printf FILE <<'EOF', $f2, $f, $f, $f2;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
@@ -216,11 +216,11 @@ if [ -f %s ]; then
 fi
 EOF
     close(FILE);
-    chmod($mode, $t) == 1 || die "error: failed to set permissions on '$t': $!\n";
+    chmod($mode, $t) == 1 || die "error: failed to set permissions on `$t': $!\n";
     print "created `$t'\n";
 
     $t = "$gitdir/hooks/post-checkout";
-    open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
+    open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
     printf FILE <<'EOF', $f;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
@@ -238,11 +238,11 @@ if [ ${sha_new} != ${sha_old} ]; then
 fi
 EOF
     close(FILE);
-    chmod($mode, $t) == 1 || die "error: failed to set permissions on '$t': $!\n";
+    chmod($mode, $t) == 1 || die "error: failed to set permissions on `$t': $!\n";
     print "created `$t'\n";
 
     $t = "$gitdir/hooks/post-merge";
-    open(FILE, '>', $t) or die "error: failed to write to '$t': $!\n";
+    open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
     printf FILE <<'EOF', $f;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
@@ -258,7 +258,7 @@ if [ $is_squash -eq 0 ]; then
 fi
 EOF
     close(FILE);
-    chmod($mode, $t) == 1 || die "error: failed to set permissions on '$t': $!\n";
+    chmod($mode, $t) == 1 || die "error: failed to set permissions on `$t': $!\n";
     print "created `$t'\n";
 }
 
