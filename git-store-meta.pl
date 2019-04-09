@@ -17,6 +17,10 @@
 #                      current metadata store file are picked if possible;
 #                      otherwise, "mtime" is picked as the default.
 #                      (available for: --store, --apply)
+#   -d|--directory     Also store, update, or apply for directories.
+#                      (available for: --store, --apply)
+#   --no-directory     Do not store, update, or apply for directories.
+#                      (available for: --store, --apply)
 #   -n|--dry-run       Run a test and print the output, without real action.
 #                      (available for: --store, --update, --apply)
 #   -v|--verbose       Apply with verbose output.
@@ -29,15 +33,14 @@
 #                      (available for: --store, --update, --apply, --install)
 #
 # FIELDs is a comma-separated string consisting of the following values:
-#   mtime      last modified time
-#   atime      last access time
-#   mode       Unix permissions
-#   user       user name
-#   group      group name
-#   uid        user ID (if user is also set, prefer user and fallback to uid)
-#   gid        group ID (if group is also set, prefer group and fallback to gid)
-#   acl        access control lists for POSIX setfacl/getfacl
-#   directory  include directories
+#   mtime   last modified time
+#   atime   last access time
+#   mode    Unix permissions
+#   user    user name
+#   group   group name
+#   uid     user ID (if user is also set, prefer user and fallback to uid)
+#   gid     group ID (if group is also set, prefer group and fallback to gid)
+#   acl     access control lists for POSIX setfacl/getfacl
 #
 # git-store-meta 2.0.0_003
 # Copyright (c) 2015-2019, Danny Lin
@@ -64,7 +67,10 @@ my $GIT_STORE_META_APP       = "git-store-meta";
 my $GIT_STORE_META_FILENAME  = ".git_store_meta";
 my $GIT                      = "git";
 my @ACTIONS = ('help', 'version', 'install', 'update', 'store', 'apply');
-my @FIELDS = ('file', 'type', 'mtime', 'atime', 'mode', 'uid', 'gid', 'user', 'group', 'acl', 'directory');
+my @FIELDS = ('file', 'type', 'mtime', 'atime', 'mode', 'uid', 'gid', 'user', 'group', 'acl');
+my %CONFIGS = (
+    directory => undef,
+);
 
 # runtime variables
 my $script = rel2abs(__FILE__);
@@ -82,7 +88,10 @@ my $cache_file_accessible = 0;
 my $cache_header_valid = 0;
 my $cache_app;
 my $cache_version;
+my %cache_configs;
 my @cache_fields;
+
+my $configs;
 
 # parse arguments
 my %argv = (
@@ -94,22 +103,24 @@ my %argv = (
     "version"    => 0,
     "target"     => undef,
     "fields"     => undef,
+    "directory"  => undef,
     "force"      => 0,
     "dry-run"    => 0,
     "verbose"    => 0,
 );
 GetOptions(
-    "store|s"    => \$argv{'store'},
-    "update|u"   => \$argv{'update'},
-    "apply|a"    => \$argv{'apply'},
-    "install|i"  => \$argv{'install'},
-    "help|h"     => \$argv{'help'},
-    "version"    => \$argv{'version'},
-    "fields|f=s" => \@{$argv{'fields'}},
-    "force"      => \$argv{'force'},
-    "dry-run|n"  => \$argv{'dry-run'},
-    "verbose|v"  => \$argv{'verbose'},
-    "target|t=s" => \$argv{'target'},
+    "store|s"      => \$argv{'store'},
+    "update|u"     => \$argv{'update'},
+    "apply|a"      => \$argv{'apply'},
+    "install|i"    => \$argv{'install'},
+    "help|h"       => \$argv{'help'},
+    "version"      => \$argv{'version'},
+    "fields|f=s"   => \@{$argv{'fields'}},
+    "directory|d!" => \$argv{'directory'},
+    "force"        => \$argv{'force'},
+    "dry-run|n"    => \$argv{'dry-run'},
+    "verbose|v"    => \$argv{'verbose'},
+    "target|t=s"   => \$argv{'target'},
 );
 
 # determine action
@@ -208,7 +219,7 @@ elsif ($action eq "apply") {
     }
 }
 
-# init fields and output header
+# adjust fields, configs and output header
 fix_fields: {
     # use $argv{'fields'} if provided, or use fields in the cache file
     # special handling for --update, which must take fields in the cache file
@@ -218,14 +229,6 @@ fix_fields: {
     }
     elsif ($cache_header_valid) {
         @{$argv{'fields'}} = @cache_fields;
-
-        # Versions < 2 use --directory rather than --field directory
-        # Add "directory" field if a directory entry exists.
-        if ($cache_version < 2) {
-            if (has_directory_entry()) {
-                push(@{$argv{'fields'}}, "directory");
-            }
-        }
     }
     else {
         @{$argv{'fields'}} = ("file", "type", "mtime");
@@ -243,10 +246,43 @@ fix_fields: {
     @{$argv{'fields'}} = @fields;
 }
 
-$git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, substr($VERSION, 1)) . "\n";
+fix_configs: {
+    # use value in the cache file for unspecified configs
+    while (my ($key, $value) = each(%cache_configs)) {
+        if (!defined($argv{$key}) || $action eq 'update') {
+            $argv{$key} = $value;
+        }
+    }
+
+    # Versions < 2 don't record --directory
+    # Add "--directory" if a directory entry exists.
+    if ($cache_version < 2) {
+        if (has_directory_entry()) {
+            $argv{'directory'} = 1;
+        }
+    }
+
+    # set default configs and header to write
+    my @configs;
+    foreach my $key (sort keys %CONFIGS) {
+        my $value = $CONFIGS{$key};
+        $argv{$key} = $value if !defined($argv{$key});
+        if (!defined($value)) {
+            # boolean style
+            push(@configs, "--$key") if $argv{$key};
+        }
+        else {
+            push(@configs, "--$key=$argv{$key}");
+        }
+    }
+
+    $configs = join(' ', @configs);
+    $git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, substr($VERSION, 1), $configs) . "\n";
+}
 
 # show settings
 print "fields: " . join(", ", @{$argv{'fields'}}) . "\n";
+print "flags: " . $configs . "\n" if $configs;
 
 # do the action
 if ($action eq "store") {
@@ -472,10 +508,21 @@ sub get_cache_header_info {
     my $line = <GIT_STORE_META_FILE>;
     $line or return;
     chomp($line);
-    my ($prefix, $app, $version) = split("\t", $line);
+    my ($prefix, $app, $version, $configs) = split("\t", $line);
     $prefix eq $GIT_STORE_META_PREFIX or return;
     $cache_app = $app;
     eval { $cache_version = version->parse("v" . $version); } or return;
+
+    if (defined($configs)) {
+        foreach (split(/\s+/, $configs)) {
+            if (m/^--([^=\s]+)=([^=\s]+)$/) {
+                $cache_configs{$1} = $2;
+            }
+            elsif (m/^--([^=\s]+)$/) {
+                $cache_configs{$1} = 1;
+            }
+        }
+    }
 
     # second line: retrieve the fields
     $line = <GIT_STORE_META_FILE>;
@@ -537,7 +584,6 @@ sub get_file_metadata {
         "user"  => $user,
         "group" => $group,
         "acl"   => $acl,
-        "directory"   => "",
     );
     # output formatted data
     foreach (@fields) {
@@ -563,7 +609,7 @@ sub store {
             print TEMP_FILE "$s\n" if $s;
         }
         close(CMD);
-        if ($fields_used{'directory'}) {
+        if ($argv{'directory'}) {
             open(CMD, "$GIT ls-tree -rd --name-only -z \$($GIT write-tree) |") or die;
             while(<CMD>) {
                 chomp;
@@ -609,7 +655,7 @@ sub update {
                 # an added file
                 print TEMP_FILE escape_filename($file)."\0\2M\0\n";
                 # mark ancestor directories as modified
-                if ($fields_used{'directory'}) {
+                if ($argv{'directory'}) {
                     my @parts = split("/", $file);
                     pop(@parts);
                     while ($#parts >= 0) {
@@ -624,7 +670,7 @@ sub update {
                 print TEMP_FILE escape_filename($file)."\0\0D\0\n";
                 # mark ancestor directories as deleted (temp and revertable)
                 # mark parent directory as modified
-                if ($fields_used{'directory'}) {
+                if ($argv{'directory'}) {
                     my @parts = split("/", $file);
                     pop(@parts);
                     if ($#parts >= 0) {
@@ -641,7 +687,7 @@ sub update {
         }
         close(CMD);
         # add all directories as a placeholder, which prevents deletion
-        if ($fields_used{'directory'}) {
+        if ($argv{'directory'}) {
             open(CMD, "$GIT ls-tree -rd --name-only -z \$($GIT write-tree) |") or die;
             while(<CMD>) { chomp; print TEMP_FILE "$_\0\1H\0\n"; }
             close(CMD);
@@ -752,7 +798,7 @@ sub apply {
                     warn "warn: `$File' is not a directory, skip applying metadata\n";
                     next;
                 }
-                if (!$fields_used{'directory'}) {
+                if (!$argv{'directory'}) {
                     next;
                 }
             }

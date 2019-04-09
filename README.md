@@ -65,14 +65,16 @@ creates a data file with these fields:
 
     <file> <type> <user> <group> <mode> <mtime> <atime>
 
-If `directory` is included in `--fields`, metadata of every directory under Git
-revision control is also stored:
+The `--directory` (`-d`) option can be provided so that all directories under
+Git revision control have their metadata stored, too.
 
-    git-store-meta.pl --store -f mtime,directory
+    git-store-meta.pl --store -d
 
-`--fields` will be recorded in the data file, and a future run of `--store`,
-`--update`, or `--apply` will load the recorded settings if not explicitly
-specified.
+Oppositely, `--no-directory` can be provided to reverse the behavior.
+
+Such settings as `--fields` and `--directory` will be recorded in the data
+file, and a future run of `--store`, `--update`, or `--apply` will load the
+recorded settings if not explicitly specified.
 
 ### Apply
 
@@ -85,10 +87,9 @@ Fields can be selectively applied. For example, to apply mtime only:
 
     git-store-meta.pl --apply -f mtime
 
-Similarly, include `directory` in `--fields` to restore metadata for
-directories as well:
+Similarly, to not apply metadata for directories:
 
-    git-store-meta.pl --apply -f mtime,directory
+    git-store-meta.pl --apply --no-directory
 
 Furthermore, the `--verbose` (`-v`) option can be used to inform what exactly
 are being applied.
