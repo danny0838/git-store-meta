@@ -21,6 +21,10 @@
 #                      (available for: --store, --apply)
 #   --no-directory     Do not store, update, or apply for directories.
 #                      (available for: --store, --apply)
+#   --topdir           Also store, update, or apply for the top directory.
+#                      (available for: --store, --apply)
+#   --no-topdir        Do not store, update, or apply for the top directory.
+#                      (available for: --store, --apply)
 #   -n|--dry-run       Run a test and print the output, without real action.
 #                      (available for: --store, --update, --apply)
 #   -v|--verbose       Apply with verbose output.
@@ -70,6 +74,7 @@ my @ACTIONS = ('help', 'version', 'install', 'update', 'store', 'apply');
 my @FIELDS = ('file', 'type', 'mtime', 'atime', 'mode', 'uid', 'gid', 'user', 'group', 'acl');
 my %CONFIGS = (
     directory => undef,
+    topdir => undef,
 );
 
 # runtime variables
@@ -104,6 +109,7 @@ my %argv = (
     "target"     => undef,
     "fields"     => undef,
     "directory"  => undef,
+    "topdir"     => undef,
     "force"      => 0,
     "dry-run"    => 0,
     "verbose"    => 0,
@@ -117,6 +123,7 @@ GetOptions(
     "version"      => \$argv{'version'},
     "fields|f=s"   => \@{$argv{'fields'}},
     "directory|d!" => \$argv{'directory'},
+    "topdir!"      => \$argv{'topdir'},
     "force"        => \$argv{'force'},
     "dry-run|n"    => \$argv{'dry-run'},
     "verbose|v"    => \$argv{'verbose'},
@@ -617,6 +624,10 @@ sub store {
                 print TEMP_FILE "$s\n" if $s;
             }
             close(CMD);
+            if ($argv{'topdir'}) {
+                my $s = join("\t", get_file_metadata(".", \@fields));
+                print TEMP_FILE "$s\n" if $s;
+            }
         }
     }
     close(TEMP_FILE);
@@ -691,6 +702,11 @@ sub update {
             open(CMD, "$GIT ls-tree -rd --name-only -z \$($GIT write-tree) |") or die;
             while(<CMD>) { chomp; print TEMP_FILE "$_\0\1H\0\n"; }
             close(CMD);
+
+            # update topdir
+            if ($argv{'topdir'}) {
+                print TEMP_FILE ".\0\2M\0\n";
+            }
         }
     }
     close(TEMP_FILE);
@@ -799,6 +815,9 @@ sub apply {
                     next;
                 }
                 if (!$argv{'directory'}) {
+                    next;
+                }
+                if ($file eq "." && !$argv{'topdir'}) {
                     next;
                 }
             }
