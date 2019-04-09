@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-#
 # =============================================================================
 # Usage: git-store-meta.pl ACTION [OPTION...]
 # Store, update, or apply metadata for files revisioned by Git.
@@ -43,7 +42,6 @@
 # Copyright (c) 2015-2019, Danny Lin
 # Released under MIT License
 # Project home: https://github.com/danny0838/git-store-meta
-#
 # =============================================================================
 
 use utf8;
