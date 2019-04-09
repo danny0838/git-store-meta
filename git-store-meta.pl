@@ -105,6 +105,154 @@ GetOptions(
     "target|t=s" => \$argv{'target'},
 );
 
+# determine action
+# priority: help > install > update > store > action if multiple assigned
+for ('help', 'install', 'update', 'store', 'apply') {
+    if ($argv{$_}) { $action = $_; last; }
+}
+
+# handle action: help, and unknown
+if (!defined($action)) {
+    usage();
+    exit 1;
+}
+elsif ($action eq "help") {
+    usage();
+    exit 0;
+}
+
+# init and validate gitdir
+$gitdir = `$GIT rev-parse --git-dir 2>/dev/null`
+    or die "error: unknown git repository.\n";
+chomp($gitdir);
+
+# handle action: install
+if ($action eq "install") {
+    print "installing hooks...\n";
+    install_hooks();
+    exit 0;
+}
+
+# init and validate topdir
+$topdir = `$GIT rev-parse --show-cdup 2>/dev/null`
+    or die "error: current working directory is not in a git working tree.\n";
+chomp($topdir);
+
+# record the original CWD before change
+my $cwd = cwd();
+
+# cd to the top level directory of current git repo
+if ($topdir) {
+  chdir($topdir);
+}
+
+# init paths and header info
+$git_store_meta_filename = defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME;
+$git_store_meta_file = rel2abs($git_store_meta_filename);
+$temp_file = $git_store_meta_file . ".tmp" . time;
+get_cache_header_info();
+
+# handle action: store, update, apply
+
+# validate
+if ($action eq "store") {
+    print "storing metadata to `$git_store_meta_file' ...\n";
+}
+elsif ($action eq "update") {
+    print "updating metadata to `$git_store_meta_file' ...\n";
+
+    if (!$cache_file_exist) {
+        die "error: `$git_store_meta_file' doesn't exist.\nRun --store to create new.\n";
+    }
+    if (!$cache_file_accessible) {
+        die "error: `$git_store_meta_file' is not an accessible file.\n";
+    }
+    if (!$cache_header_valid) {
+        die "error: `$git_store_meta_file' is malformatted.\nFix it or run --store to create new.\n";
+    }
+    if ($cache_app ne $GIT_STORE_META_APP) {
+        die "error: `$git_store_meta_file' is using an unknown schema: $cache_app $cache_version\nFix it or run --store to create new.\n";
+    }
+    if (!(1.1.0 <= $cache_version && $cache_version < 2.1.0)) {
+        die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
+    }
+}
+elsif ($action eq "apply") {
+    print "applying metadata from `$git_store_meta_file' ...\n";
+
+    if (!$cache_file_exist) {
+        print "`$git_store_meta_file' doesn't exist, skipped.\n";
+        exit;
+    }
+    if (!$argv{'force'} && `$GIT status --porcelain -uno -z 2>/dev/null` ne "") {
+      die "error: git working tree is not clean.\nCommit, stash, or revert changes before running this, or add --force.\n";
+    }
+    if (!$cache_file_accessible) {
+        die "error: `$git_store_meta_file' is not an accessible file.\n";
+    }
+    if (!$cache_header_valid) {
+        die "error: `$git_store_meta_file' is malformatted.\n";
+    }
+    if ($cache_app ne $GIT_STORE_META_APP) {
+        die "error: `$git_store_meta_file' is using an unknown schema: $cache_app $cache_version\n";
+    }
+}
+
+# init fields and output header
+my @fields = get_fields();
+$git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, substr($VERSION, 1)) . "\n";
+
+# show settings
+print "fields: " . join(", ", @fields) . "\n";
+
+# do the action
+if ($action eq "store") {
+    if (!$argv{'dry-run'}) {
+        open(GIT_STORE_META_FILE, '>', $git_store_meta_file)
+            or die "error: failed to write to `$git_store_meta_file': $!\n";
+        select(GIT_STORE_META_FILE);
+        store(@fields);
+        close(GIT_STORE_META_FILE);
+        select(STDOUT);
+    }
+    else {
+        store(@fields);
+    }
+}
+elsif ($action eq "update") {
+    # copy the cache file to the temp file
+    # to prevent a conflict in further operation
+    open(GIT_STORE_META_FILE, "<", $git_store_meta_file)
+        or die "error: failed to access `$git_store_meta_file': $!\n";
+    open(TEMP_FILE, ">", $temp_file) or die;
+    my $count = 0;
+    while (<GIT_STORE_META_FILE>) {
+        if (++$count <= 2) { next; }  # discard first 2 lines
+        print TEMP_FILE;
+    }
+    close(TEMP_FILE);
+    close(GIT_STORE_META_FILE);
+
+    # update cache
+    if (!$argv{'dry-run'}) {
+        open(GIT_STORE_META_FILE, '>', $git_store_meta_file)
+            or die "error: failed to write to `$git_store_meta_file': $!\n";
+        select(GIT_STORE_META_FILE);
+        update(@fields);
+        close(GIT_STORE_META_FILE);
+        select(STDOUT);
+    }
+    else {
+        update(@fields);
+    }
+
+    # clean up
+    my $clear = unlink($temp_file);
+}
+elsif ($action eq "apply") {
+    apply(@fields);
+}
+
 # -----------------------------------------------------------------------------
 
 sub get_file_type {
@@ -746,157 +894,3 @@ sub apply {
         die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
     }
 }
-
-# -----------------------------------------------------------------------------
-
-sub main {
-    # determine action
-    # priority: help > install > update > store > action if multiple assigned
-    for ('help', 'install', 'update', 'store', 'apply') {
-        if ($argv{$_}) { $action = $_; last; }
-    }
-
-    # handle action: help, and unknown
-    if (!defined($action)) {
-        usage();
-        exit 1;
-    }
-    elsif ($action eq "help") {
-        usage();
-        exit 0;
-    }
-
-    # init and validate gitdir
-    $gitdir = `$GIT rev-parse --git-dir 2>/dev/null`
-        or die "error: unknown git repository.\n";
-    chomp($gitdir);
-
-    # handle action: install
-    if ($action eq "install") {
-        print "installing hooks...\n";
-        install_hooks();
-        exit 0;
-    }
-
-    # init and validate topdir
-    $topdir = `$GIT rev-parse --show-cdup 2>/dev/null`
-        or die "error: current working directory is not in a git working tree.\n";
-    chomp($topdir);
-
-    # record the original CWD before change
-    my $cwd = cwd();
-
-    # cd to the top level directory of current git repo
-    if ($topdir) {
-      chdir($topdir);
-    }
-
-    # init paths and header info
-    $git_store_meta_filename = defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME;
-    $git_store_meta_file = rel2abs($git_store_meta_filename);
-    $temp_file = $git_store_meta_file . ".tmp" . time;
-    get_cache_header_info();
-
-    # handle action: store, update, apply
-
-    # validate
-    if ($action eq "store") {
-        print "storing metadata to `$git_store_meta_file' ...\n";
-    }
-    elsif ($action eq "update") {
-        print "updating metadata to `$git_store_meta_file' ...\n";
-
-        if (!$cache_file_exist) {
-            die "error: `$git_store_meta_file' doesn't exist.\nRun --store to create new.\n";
-        }
-        if (!$cache_file_accessible) {
-            die "error: `$git_store_meta_file' is not an accessible file.\n";
-        }
-        if (!$cache_header_valid) {
-            die "error: `$git_store_meta_file' is malformatted.\nFix it or run --store to create new.\n";
-        }
-        if ($cache_app ne $GIT_STORE_META_APP) {
-            die "error: `$git_store_meta_file' is using an unknown schema: $cache_app $cache_version\nFix it or run --store to create new.\n";
-        }
-        if (!(1.1.0 <= $cache_version && $cache_version < 2.1.0)) {
-            die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
-        }
-    }
-    elsif ($action eq "apply") {
-        print "applying metadata from `$git_store_meta_file' ...\n";
-
-        if (!$cache_file_exist) {
-            print "`$git_store_meta_file' doesn't exist, skipped.\n";
-            exit;
-        }
-        if (!$argv{'force'} && `$GIT status --porcelain -uno -z 2>/dev/null` ne "") {
-          die "error: git working tree is not clean.\nCommit, stash, or revert changes before running this, or add --force.\n";
-        }
-        if (!$cache_file_accessible) {
-            die "error: `$git_store_meta_file' is not an accessible file.\n";
-        }
-        if (!$cache_header_valid) {
-            die "error: `$git_store_meta_file' is malformatted.\n";
-        }
-        if ($cache_app ne $GIT_STORE_META_APP) {
-            die "error: `$git_store_meta_file' is using an unknown schema: $cache_app $cache_version\n";
-        }
-    }
-
-    # init fields and output header
-    my @fields = get_fields();
-    $git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, substr($VERSION, 1)) . "\n";
-
-    # show settings
-    print "fields: " . join(", ", @fields) . "\n";
-
-    # do the action
-    if ($action eq "store") {
-        if (!$argv{'dry-run'}) {
-            open(GIT_STORE_META_FILE, '>', $git_store_meta_file)
-                or die "error: failed to write to `$git_store_meta_file': $!\n";
-            select(GIT_STORE_META_FILE);
-            store(@fields);
-            close(GIT_STORE_META_FILE);
-            select(STDOUT);
-        }
-        else {
-            store(@fields);
-        }
-    }
-    elsif ($action eq "update") {
-        # copy the cache file to the temp file
-        # to prevent a conflict in further operation
-        open(GIT_STORE_META_FILE, "<", $git_store_meta_file)
-            or die "error: failed to access `$git_store_meta_file': $!\n";
-        open(TEMP_FILE, ">", $temp_file) or die;
-        my $count = 0;
-        while (<GIT_STORE_META_FILE>) {
-            if (++$count <= 2) { next; }  # discard first 2 lines
-            print TEMP_FILE;
-        }
-        close(TEMP_FILE);
-        close(GIT_STORE_META_FILE);
-
-        # update cache
-        if (!$argv{'dry-run'}) {
-            open(GIT_STORE_META_FILE, '>', $git_store_meta_file)
-                or die "error: failed to write to `$git_store_meta_file': $!\n";
-            select(GIT_STORE_META_FILE);
-            update(@fields);
-            close(GIT_STORE_META_FILE);
-            select(STDOUT);
-        }
-        else {
-            update(@fields);
-        }
-
-        # clean up
-        my $clear = unlink($temp_file);
-    }
-    elsif ($action eq "apply") {
-        apply(@fields);
-    }
-}
-
-main();
