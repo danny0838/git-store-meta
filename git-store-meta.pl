@@ -352,7 +352,9 @@ sub get_fields {
         # Versions < 2 use --directory rather than --field directory
         # Add "directory" field if a directory entry exists.
         if ($cache_version < 2) {
-            if (has_directory_entry()) { push(@parts, "directory"); }
+            if (has_directory_entry()) {
+                push(@parts, "directory");
+            }
         }
     }
     else {
@@ -761,7 +763,9 @@ sub apply {
 sub main {
     # determine action
     # priority: help > install > update > store > action if multiple assigned
-    for ('help', 'install', 'update', 'store', 'apply') { if ($argv{$_}) { $action = $_; last; } }
+    for ('help', 'install', 'update', 'store', 'apply') {
+        if ($argv{$_}) { $action = $_; last; }
+    }
 
     # handle action: help, and unknown
     if (!defined($action)) {
