@@ -509,15 +509,6 @@ sub update {
             while(<CMD>) { chomp; print TEMP_FILE "$_\0\1H\0\n"; }
             close(CMD);
         }
-        # update $git_store_meta_file if it's in the git working tree
-        check_meta_file: {
-            my $cmd = join(" ", ($GIT, "ls-files", "--error-unmatch", "-z", "--", escapeshellarg($git_store_meta_file), "2>&1"));
-            my $file = `$cmd`;
-            if ($? == 0) {
-                chomp($file);
-                print TEMP_FILE escape_filename($file)."\0\2M\0\n";
-            }
-        }
     }
     close(TEMP_FILE);
 
