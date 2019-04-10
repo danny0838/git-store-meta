@@ -51,34 +51,35 @@ variable, and run `git-store-meta.pl` instead.
 
 To store the metadata of all git-revisioned files, run:
 
-    git-store-meta.pl --store -f user,group,mode,mtime,atime
+    git-store-meta.pl --store
 
 And a data file named `.git_store_meta` (by default) will be created in your
 repo, `git add` it so that the metadata is revisioned.
 
-The `--fields` (`-f`) option determines which fields are to be stored. Their
-order matters partially since it affects the order of fields in the data
-file, but it doesn't affect applying. For example the above command creates
-a data file with these fields:
+The `--fields` (`-f`) option determines the fields to be stored. For example,
+the command:
+
+    git-store-meta.pl --store -f user,group,mode,mtime,atime
+
+creates a data file with these fields:
 
     <file> <type> <user> <group> <mode> <mtime> <atime>
-
-If `--fields` is not provided, git-store-meta takes the fields defined in the
-current data file, and thus running `git-store-meta.pl --store` works in most
-usual cases.
 
 If `directory` is included in `--fields`, metadata of every directory under Git
 revision control is also stored:
 
     git-store-meta.pl --store -f mtime,directory
 
+`--fields` will be recorded in the data file, and a future run of `--store`,
+`--update`, or `--apply` will load the recorded settings if not explicitly
+specified.
+
 ### Apply
 
-To apply (restore) the metadata recorded in the data file, run:
+To apply (restore) all metadata recorded in the data file to working tree
+files, run:
 
     git-store-meta.pl --apply
-
-And all recorded metadata will be applied to the working tree files.
 
 Fields can be selectively applied. For example, to apply mtime only:
 
@@ -89,19 +90,13 @@ directories as well:
 
     git-store-meta.pl --apply -f mtime,directory
 
-Furthermore, the `--verbose` (`-v`) option can be used to info what exactly are
-being applied.
+Furthermore, the `--verbose` (`-v`) option can be used to inform what exactly
+are being applied.
 
 An `--apply` can not be run when the working tree or index is dirty, since the
 data is in an inconsistent state in such case and the apply could be an
 irreversible mistake. The `--force` option can be added to skip the check and
 force the applying.
-
-For a special use case such as to apply metadata for files checked out from a
-bare repo `/path/to/foo` to an isolated directory `/path/to/bar`, related Git
-environment variables must be explicitly provided to pass the check, such as:
-
-    GIT_DIR=../foo GIT_WORK_TREE=. ../foo/hooks/git-store-meta.pl --apply
 
 ### Update
 
@@ -139,16 +134,19 @@ reset, an `--apply` must be run manually.
 
 ### Help
 
-For available options and a detail description, run:
+For more available options and details, run:
 
     git-store-meta.pl --help
 
 Caveats:
 -------------------------------------------------------------------------------
 
-* git-store-meta cannot restore the metadata for symbolic links without the
-  support of system command `chown -h`, `chgrp -h`, and `touch -h`. In those
-  systems metadata of symbolic links are never restored.
-
 * git-store-meta does not record the time more than seconds precision, as it's
   not supported widely enough and many systems simply ignore it.
+
+* git-store-meta is bound to a git repository. If the git directory or the
+  working tree directory cannot be automatically determined, provide them
+  explicitly to get it work. For example, to apply metadata for files checked
+  out from a bare repo `/path/to/foo` to current directory `/path/to/bar`:
+
+      GIT_DIR=../foo GIT_WORK_TREE=. ../foo/hooks/git-store-meta.pl --apply
