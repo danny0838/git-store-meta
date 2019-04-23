@@ -14,7 +14,7 @@
 #
 # Available OPTIONs are:
 #   -f|--fields FIELDs Fields to handle (see below). If omitted, fields in the
-#                      current metadata store file are picked if possible;
+#                      current metadata store file are picked when possible;
 #                      otherwise, "mtime" is picked as the default.
 #                      (available for: --store, --apply)
 #   -d|--directory     Also store, update, or apply for directories.

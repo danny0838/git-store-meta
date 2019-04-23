@@ -32,7 +32,7 @@ Dependency:
 - perl >=5.8 with built-in modules (required by Git)
 - sort (any version) (required by Git)
 - setfacl, getfacl (optional, for manipulating ACL metadata)
-- touch, chown, chgrp (optional, for applying metadata to links)
+- touch, chown, chgrp (optional, for applying metadata to symbolic links)
 
 Usage:
 -------------------------------------------------------------------------------
@@ -45,7 +45,7 @@ For a centralized installation, place `git-store-meta.pl` at a desired path,
 add executable permission to it, add its directory to the `PATH` environment
 variable, and run `git-store-meta.pl` instead.
 
-`git-store-meta.pl` can be run with the subcommands below:
+`git-store-meta.pl` can be run with the actions below:
 
 ### Store
 
