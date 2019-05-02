@@ -129,9 +129,11 @@ are existing hooks. In this case you can rename the existing hook files, run
 the installation again, and merge the hook contents manually. The `--force`
 option can be added to overwrite existing hooks if desired.
 
-Note that since Git doesn't provide a "post-reset" hook, git-store-meta doesn't
-run after a successful `git reset --hard`. To restore file metadata after a
-reset, an `--apply` must be run manually.
+Note that certain advanced git operations are not covered by hooks. For
+example, no hook is run after a successful `git reset --hard`, `git rebase`,
+or `git filter-branch`. Likewise, no hook is run in the submodule repositories
+after a successful `git submodule update`. An `--apply` must be run manually
+in such cases.
 
 ### Help
 
