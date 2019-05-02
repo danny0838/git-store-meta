@@ -263,7 +263,7 @@ fix_configs: {
 
     # Versions < 2 don't record --directory
     # Add "--directory" if a directory entry exists.
-    if ($cache_version < 2) {
+    if (defined($cache_version) && $cache_version < 2) {
         if (has_directory_entry()) {
             $argv{'directory'} = 1;
         }
