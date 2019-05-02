@@ -201,7 +201,7 @@ elsif ($action eq "update") {
     if ($cache_app ne $GIT_STORE_META_APP) {
         die "error: `$git_store_meta_file' is using an unknown schema: $cache_app $cache_version\nFix it or run --store to create new.\n";
     }
-    if (!(1.1.0 <= $cache_version && $cache_version < 2.1.0)) {
+    if (!(2.0.0 <= $cache_version && $cache_version < 2.1.0)) {
         die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
     }
 }
@@ -212,7 +212,7 @@ elsif ($action eq "apply") {
         print "`$git_store_meta_file' doesn't exist, skipped.\n";
         exit;
     }
-    if (!$argv{'force'} && `$GIT status --porcelain -uno -z 2>/dev/null` ne "") {
+    if (!$argv{'force'} && `$GIT status --porcelain -uno --ignore-submodules=all -z 2>/dev/null` ne "") {
       die "error: git working tree is not clean.\nCommit, stash, or revert changes before running this, or add --force.\n";
     }
     if (!$cache_file_accessible) {
@@ -608,18 +608,22 @@ sub store {
     list: {
         # set input record separator for chomp
         local $/ = "\0";
-        open(CMD, "$GIT ls-files -z |") or die;
+        open(CMD, "$GIT ls-files -s -z |") or die;
         while(<CMD>) {
             chomp;
+            next if m|^16|;  # skip submodules (mode = 160000)
+            s|^.*?\t||;  # remove fields other than filename
             next if $_ eq $git_store_meta_filename;  # skip data file
             my $s = join("\t", get_file_metadata($_, \@fields));
             print TEMP_FILE "$s\n" if $s;
         }
         close(CMD);
         if ($argv{'directory'}) {
-            open(CMD, "$GIT ls-tree -rd --name-only -z \$($GIT write-tree) |") or die;
+            open(CMD, "$GIT ls-tree -rd -z \$($GIT write-tree) |") or die;
             while(<CMD>) {
                 chomp;
+                next if m|^16|;  # skip submodules (mode = 160000)
+                s|^.*?\t||;  # remove fields other than filename
                 my $s = join("\t", get_file_metadata($_, \@fields));
                 print TEMP_FILE "$s\n" if $s;
             }
@@ -653,7 +657,7 @@ sub update {
         # set input record separator for chomp
         local $/ = "\0";
         # go through the diff list and append entries
-        open(CMD, "$GIT diff --name-status --cached --no-renames -z |") or die;
+        open(CMD, "$GIT diff --name-status --cached --no-renames --ignore-submodules=all -z |") or die;
         while(my $stat = <CMD>) {
             chomp($stat);
             my $file = <CMD>;

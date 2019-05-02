@@ -27,7 +27,7 @@ Features:
 Dependency:
 -------------------------------------------------------------------------------
 
-- git (any version)
+- git >= 1.7.2
 - *nix platform with basic shell environment (required by Git)
 - perl >=5.8 with built-in modules (required by Git)
 - sort (any version) (required by Git)
