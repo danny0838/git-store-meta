@@ -58,7 +58,6 @@ use strict;
 use version; our $VERSION = version->declare("v2.0.0_006");
 use Getopt::Long;
 Getopt::Long::Configure qw(gnu_getopt);
-use Cwd;
 use File::Basename;
 use File::Path qw(make_path);
 use File::Spec::Functions qw(rel2abs abs2rel catfile);
@@ -163,9 +162,6 @@ if ($action eq "install") {
 $topdir = `$GIT rev-parse --show-cdup 2>/dev/null`
     or die "error: current working directory is not in a git working tree.\n";
 chomp($topdir);
-
-# record the original CWD before change
-my $cwd = cwd();
 
 # cd to the top level directory of current git repo
 chdir($topdir) if $topdir;
