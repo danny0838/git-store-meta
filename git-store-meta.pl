@@ -389,7 +389,6 @@ sub usage {
     close(GIT_STORE_META);
 }
 
-# Install hooks
 sub install_hooks {
     # Ensure hook files don't exist unless --force
     if (!$argv{'force'}) {
@@ -476,15 +475,6 @@ EOF
     print "created `$t'\n";
 }
 
-# return the header and fields info of a file
-#
-# @global $git_store_meta_file
-# @global $cache_file_exist
-# @global $cache_file_accessible
-# @global $cache_header_valid
-# @global $cache_app
-# @global $cache_version
-# @global $cache_fields
 sub get_cache_header_info {
     -e $git_store_meta_file or return;
     $cache_file_exist = 1;
@@ -527,7 +517,6 @@ sub get_cache_header_info {
     $cache_header_valid = 1;
 }
 
-# @global $git_store_meta_file
 sub has_directory_entry {
     open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
     my $count = 0;
@@ -745,8 +734,6 @@ sub update {
     close(CMD);
 }
 
-# @global @cache_fields
-# @global $cache_version
 sub apply {
     my @fields = @{$argv{'fields'}};
     my %fields_used = map { $_ => 1 } @fields;
