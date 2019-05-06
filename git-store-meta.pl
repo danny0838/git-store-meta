@@ -613,7 +613,7 @@ sub store {
         open(CMD, "$GIT ls-files -s -z |") or die;
         while(<CMD>) {
             chomp;
-            next if m|^16|;  # skip submodules (mode = 160000)
+            next if m|^160000 |;  # skip submodules
             s|^.*?\t||;  # remove fields other than filename
             next if $_ eq $git_store_meta_filename;  # skip data file
             my $s = join("\t", get_file_metadata($_, \@fields));
@@ -624,7 +624,7 @@ sub store {
             open(CMD, "$GIT ls-tree -rd -z \$($GIT write-tree) |") or die;
             while(<CMD>) {
                 chomp;
-                next if m|^16|;  # skip submodules (mode = 160000)
+                next if m|^160000 |;  # skip submodules
                 s|^.*?\t||;  # remove fields other than filename
                 my $s = join("\t", get_file_metadata($_, \@fields));
                 print TEMP_FILE "$s\n" if $s;
