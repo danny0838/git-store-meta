@@ -60,7 +60,6 @@ use Getopt::Long;
 Getopt::Long::Configure qw(gnu_getopt);
 use Cwd;
 use File::Basename;
-use File::Copy qw(copy);
 use File::Path qw(make_path);
 use File::Spec::Functions qw(rel2abs abs2rel catfile);
 use POSIX qw(strftime);
@@ -140,12 +139,10 @@ foreach (@ACTIONS) {
 if (!defined($action)) {
     usage();
     exit 1;
-}
-elsif ($action eq "help") {
+} elsif ($action eq "help") {
     usage();
     exit 0;
-}
-elsif ($action eq "version") {
+} elsif ($action eq "version") {
     print $VERSION . "\n";
     exit 0;
 }
@@ -171,9 +168,7 @@ chomp($topdir);
 my $cwd = cwd();
 
 # cd to the top level directory of current git repo
-if ($topdir) {
-  chdir($topdir);
-}
+chdir($topdir) if $topdir;
 
 # init paths and header info
 $git_store_meta_filename = defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME;
@@ -186,8 +181,7 @@ get_cache_header_info();
 # validate
 if ($action eq "store") {
     print "storing metadata to `$git_store_meta_file' ...\n";
-}
-elsif ($action eq "update") {
+} elsif ($action eq "update") {
     print "updating metadata to `$git_store_meta_file' ...\n";
 
     if (!$cache_file_exist) {
@@ -205,8 +199,7 @@ elsif ($action eq "update") {
     if (!(2.0.0 <= $cache_version && $cache_version < 2.1.0)) {
         die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
     }
-}
-elsif ($action eq "apply") {
+} elsif ($action eq "apply") {
     print "applying metadata from `$git_store_meta_file' ...\n";
 
     if (!$cache_file_exist) {
@@ -234,11 +227,9 @@ fix_fields: {
     if (@{$argv{'fields'}} > 0 && $action ne "update") {
         @{$argv{'fields'}} = split(/\s*,\s*/, join(",", @{$argv{'fields'}}));
         unshift(@{$argv{'fields'}}, "file", "type");
-    }
-    elsif ($cache_header_valid) {
+    } elsif ($cache_header_valid) {
         @{$argv{'fields'}} = @cache_fields;
-    }
-    else {
+    } else {
         @{$argv{'fields'}} = ("file", "type", "mtime");
     }
 
@@ -278,8 +269,7 @@ fix_configs: {
         if (!defined($value)) {
             # boolean style
             push(@configs, "--$key") if $argv{$key};
-        }
-        else {
+        } else {
             push(@configs, "--$key=$argv{$key}");
         }
     }
@@ -302,12 +292,10 @@ if ($action eq "store") {
         store();
         close(GIT_STORE_META_FILE);
         select(STDOUT);
-    }
-    else {
+    } else {
         store();
     }
-}
-elsif ($action eq "update") {
+} elsif ($action eq "update") {
     # copy the cache file to the temp file
     # to prevent a conflict in further operation
     open(GIT_STORE_META_FILE, "<", $git_store_meta_file)
@@ -315,7 +303,7 @@ elsif ($action eq "update") {
     open(TEMP_FILE, ">", $temp_file) or die;
     my $count = 0;
     while (<GIT_STORE_META_FILE>) {
-        if (++$count <= 2) { next; }  # discard first 2 lines
+        next if ++$count <= 2;  # discard first 2 lines
         print TEMP_FILE;
     }
     close(TEMP_FILE);
@@ -329,15 +317,13 @@ elsif ($action eq "update") {
         update();
         close(GIT_STORE_META_FILE);
         select(STDOUT);
-    }
-    else {
+    } else {
         update();
     }
 
     # clean up
-    my $clear = unlink($temp_file);
-}
-elsif ($action eq "apply") {
+    unlink($temp_file);
+} elsif ($action eq "apply") {
     apply();
 }
 
@@ -347,11 +333,9 @@ sub get_file_type {
     my ($file) = @_;
     if (-l $file) {
         return "l";
-    }
-    elsif (-f $file) {
+    } elsif (-f $file) {
         return "f";
-    }
-    elsif (-d $file) {
+    } elsif (-d $file) {
         return "d";
     }
     return undef;
@@ -365,7 +349,7 @@ sub timestamp_to_gmtime {
 
 sub gmtime_to_timestamp {
     my ($gmtime) = @_;
-    $gmtime =~ m!^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$!;
+    $gmtime =~ m/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/;
     return timegm($6, $5, $4, $3, $2 - 1, $1);
 }
 
@@ -379,7 +363,7 @@ sub escapeshellarg {
 # escape special chars in a filename to be safe to stay in the data file
 sub escape_filename {
     my ($str) = @_;
-    $str =~ s!([\x00-\x1F\x5C\x7F])!'\x'.sprintf("%02X", ord($1))!eg;
+    $str =~ s/([\x00-\x1F\x5C\x7F])/'\x'.sprintf("%02X", ord($1))/eg;
     return $str;
 }
 
@@ -387,7 +371,7 @@ sub escape_filename {
 # "\\" is left for backward compatibility with versions < 1.1.4
 sub unescape_filename {
     my ($str) = @_;
-    $str =~ s!\\(?:x([0-9A-Fa-f]{2})|\\)!$1?chr(hex($1)):"\\"!eg;
+    $str =~ s/\\(?:x([0-9A-Fa-f]{2})|\\)/$1?chr(hex($1)):"\\"/eg;
     return $str;
 }
 
@@ -397,15 +381,14 @@ sub usage {
     my $start = 0;
     open(GIT_STORE_META, "<", $script)
         or die "error: failed to access `$script': $!\n";
-    while (my $line = <GIT_STORE_META>) {
-        if ($line =~ m!^# ={2,}!) {
+    while (<GIT_STORE_META>) {
+        if (m/^# ={2,}/) {
             if (!$start) { $start = 1; next; }
             else { last; }
         }
-        if ($start) {
-            $line =~ s/^# ?//;
-            print $line;
-        }
+        next if !$start;
+        s/^# ?//;
+        print;
     }
     close(GIT_STORE_META);
 }
@@ -526,8 +509,7 @@ sub get_cache_header_info {
         foreach (split(/\s+/, $configs)) {
             if (m/^--([^=\s]+)=([^=\s]+)$/) {
                 $cache_configs{$1} = $2;
-            }
-            elsif (m/^--([^=\s]+)$/) {
+            } elsif (m/^--([^=\s]+)$/) {
                 $cache_configs{$1} = 1;
             }
         }
@@ -538,7 +520,7 @@ sub get_cache_header_info {
     $line or return;
     chomp($line);
     foreach (split("\t", $line)) {
-        m!^<(.*)>$! and push(@cache_fields, $1) or return;
+        m/^<(.*)>$/ and push(@cache_fields, $1) or return;
     }
 
     # check for existence of "file" and "type" fields
@@ -553,15 +535,11 @@ sub get_cache_header_info {
 sub has_directory_entry {
     open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
     my $count = 0;
-    while (my $line = <GIT_STORE_META_FILE>) {
-        if (++$count <= 2) { next; }  # discard first 2 lines
-        $line =~ s/^\s+//; $line =~ s/\s+$//;
-        next if $line eq "";
-
-        # for each line, parse the record
-        if ((split("\t", $line))[1] eq "d") {
-            return 1;
-        }
+    while (<GIT_STORE_META_FILE>) {
+        next if ++$count <= 2;  # skip first 2 lines
+        s/^\s+//; s/\s+$//;
+        next if $_ eq "";
+        return 1 if (split "\t")[1] eq "d";
     }
     return 0;
 }
@@ -613,26 +591,26 @@ sub store {
         open(CMD, "$GIT ls-files -s -z |") or die;
         while(<CMD>) {
             chomp;
-            next if m|^160000 |;  # skip submodules
-            s|^.*?\t||;  # remove fields other than filename
+            next if m/^160000 /;  # skip submodules
+            s/^.*?\t//;  # remove fields other than filename
             next if $_ eq $git_store_meta_filename;  # skip data file
-            my $s = join("\t", get_file_metadata($_, \@fields));
-            print TEMP_FILE "$s\n" if $s;
+            $_ = join("\t", get_file_metadata($_, \@fields));
+            print TEMP_FILE "$_\n" if $_;
         }
         close(CMD);
         if ($argv{'directory'}) {
             open(CMD, "$GIT ls-tree -rd -z \$($GIT write-tree) |") or die;
             while(<CMD>) {
                 chomp;
-                next if m|^160000 |;  # skip submodules
-                s|^.*?\t||;  # remove fields other than filename
-                my $s = join("\t", get_file_metadata($_, \@fields));
-                print TEMP_FILE "$s\n" if $s;
+                next if m/^160000 /;  # skip submodules
+                s/^.*?\t//;  # remove fields other than filename
+                $_ = join("\t", get_file_metadata($_, \@fields));
+                print TEMP_FILE "$_\n" if $_;
             }
             close(CMD);
             if ($argv{'topdir'}) {
-                my $s = join("\t", get_file_metadata(".", \@fields));
-                print TEMP_FILE "$s\n" if $s;
+                $_ = join("\t", get_file_metadata(".", \@fields));
+                print TEMP_FILE "$_\n" if $_;
             }
         }
     }
@@ -646,7 +624,7 @@ sub store {
     close(CMD);
 
     # clean up
-    my $clear = unlink($temp_file);
+    unlink($temp_file);
 }
 
 sub update {
@@ -667,8 +645,7 @@ sub update {
             if ($stat eq "M") {
                 # a modified file
                 print TEMP_FILE escape_filename($file)."\0\2M\0\n";
-            }
-            elsif ($stat eq "A") {
+            } elsif ($stat eq "A") {
                 # an added file
                 print TEMP_FILE escape_filename($file)."\0\2M\0\n";
                 # mark ancestor directories as modified
@@ -681,8 +658,7 @@ sub update {
                         pop(@parts);
                     }
                 }
-            }
-            elsif ($stat eq "D") {
+            } elsif ($stat eq "D") {
                 # a deleted file
                 print TEMP_FILE escape_filename($file)."\0\0D\0\n";
                 # mark ancestor directories as deleted (temp and revertable)
@@ -731,16 +707,15 @@ sub update {
     # path, so that the original entry is overwritten.
     while ($cur_line = <CMD>) {
         chomp($cur_line);
-        if ($cur_line =~ m!\x00[\x00-\x02]+(\w+)\x00!) {
+        if ($cur_line =~ m/\x00[\x00-\x02]+(\w+)\x00/) {
             # has mark: a changed entry line
             $cur_stat = $1;
-            $cur_line =~ s!\x00[\x00-\x02]+\w+\x00!!;
+            $cur_line =~ s/\x00[\x00-\x02]+\w+\x00//;
             $cur_file = $cur_line;
             if ($cur_stat eq "D") {
                 # a delete => clear $cur_line so that this path is not printed
                 $cur_line = "";
-            }
-            elsif ($cur_stat eq "H") {
+            } elsif ($cur_stat eq "H") {
                 # a placeholder => revert previous "delete"
                 # This is after a delete (optionally) and before a modify or
                 # no-op line (must). We clear $last_file so the next line will
@@ -748,8 +723,7 @@ sub update {
                 $last_file = "";
                 next;
             }
-        }
-        else {
+        } else {
             # a no-op line
             $cur_stat = "";
             ($cur_file) = split("\t", $cur_line);
@@ -763,10 +737,9 @@ sub update {
                 if ($cur_file eq $git_store_meta_filename) {
                     # skip data file
                     $cur_line = "";
-                }
-                else {
-                    my $s = join("\t", get_file_metadata(unescape_filename($cur_file), \@fields));
-                    $cur_line = $s ? "$s\n" : "";
+                } else {
+                    $_ = join("\t", get_file_metadata(unescape_filename($cur_file), \@fields));
+                    $cur_line = $_ ? "$_\n" : "";
                 }
             }
             print $cur_line;
@@ -787,13 +760,13 @@ sub apply {
     if (1.0.0 <= $cache_version && $cache_version < 2.1.0) {
         my $count = 0;
         open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
-        while (my $line = <GIT_STORE_META_FILE>) {
-            ++$count <= 2 && next;  # skip first 2 lines (header)
-            $line =~ s/^\s+//; $line =~ s/\s+$//;
-            next if $line eq "";
+        while (<GIT_STORE_META_FILE>) {
+            next if ++$count <= 2;  # skip first 2 lines (header)
+            s/^\s+//; s/\s+$//;
+            next if $_ eq "";
 
             # for each line, parse the record
-            my @rec = split("\t", $line);
+            my @rec = split("\t");
             my %data;
             for (my $i=0; $i<=$#cache_fields; $i++) {
                 $data{$cache_fields[$i]} = $rec[$i];
@@ -814,8 +787,7 @@ sub apply {
                     warn "warn: `$File' is not a file, skip applying metadata\n";
                     next;
                 }
-            }
-            elsif ($type eq "d") {
+            } elsif ($type eq "d") {
                 if (! -d $file) {
                     warn "warn: `$File' is not a directory, skip applying metadata\n";
                     next;
@@ -826,8 +798,7 @@ sub apply {
                 if ($file eq "." && !$argv{'topdir'}) {
                     next;
                 }
-            }
-            else {
+            } else {
                 warn "warn: `$File' is recorded as an unknown type, skip applying metadata\n";
                 next;
             }
@@ -841,17 +812,18 @@ sub apply {
                     print "`$File' set user to '$data{'user'}'\n" if $argv{'verbose'};
                     if (defined $uid) {
                         if (!$argv{'dry-run'}) {
-                            if (! -l $file) { $check = chown($uid, $gid, $file); }
-                            else {
+                            if (! -l $file) {
+                                $check = chown($uid, $gid, $file);
+                            } else {
                                 my $cmd = join(" ", ("chown", "-h", escapeshellarg($data{'user'}), escapeshellarg("./$file"), "2>&1"));
                                 `$cmd`; $check = ($? == 0);
                             }
+                        } else {
+                            $check = 1;
                         }
-                        else { $check = 1; }
                         warn "warn: `$File' cannot set user to '$data{'user'}'\n" if !$check;
                         last set_user if $check;
-                    }
-                    else {
+                    } else {
                         warn "warn: $data{'user'} is not a valid user.\n";
                     }
                 }
@@ -860,13 +832,15 @@ sub apply {
                     my $gid = (lstat($file))[5];
                     print "`$File' set uid to '$uid'\n" if $argv{'verbose'};
                     if (!$argv{'dry-run'}) {
-                        if (! -l $file) { $check = chown($uid, $gid, $file); }
-                        else {
+                        if (! -l $file) {
+                            $check = chown($uid, $gid, $file);
+                        } else {
                             my $cmd = join(" ", ("chown", "-h", escapeshellarg($uid), escapeshellarg("./$file"), "2>&1"));
                             `$cmd`; $check = ($? == 0);
                         }
+                    } else {
+                        $check = 1;
                     }
-                    else { $check = 1; }
                     warn "warn: `$File' cannot set uid to '$uid'\n" if !$check;
                 }
             }
@@ -877,17 +851,18 @@ sub apply {
                     print "`$File' set group to '$data{'group'}'\n" if $argv{'verbose'};
                     if (defined $gid) {
                         if (!$argv{'dry-run'}) {
-                            if (! -l $file) { $check = chown($uid, $gid, $file); }
-                            else {
+                            if (! -l $file) {
+                                $check = chown($uid, $gid, $file);
+                            } else {
                                 my $cmd = join(" ", ("chgrp", "-h", escapeshellarg($data{'group'}), escapeshellarg("./$file"), "2>&1"));
                                 `$cmd`; $check = ($? == 0);
                             }
+                        } else {
+                            $check = 1;
                         }
-                        else { $check = 1; }
                         warn "warn: `$File' cannot set group to '$data{'group'}'\n" if !$check;
                         last set_group if $check;
-                    }
-                    else {
+                    } else {
                         warn "warn: $data{'group'} is not a valid user group.\n";
                     }
                 }
@@ -896,13 +871,15 @@ sub apply {
                     my $gid = $data{'gid'};
                     print "`$File' set gid to '$gid'\n" if $argv{'verbose'};
                     if (!$argv{'dry-run'}) {
-                        if (! -l $file) { $check = chown($uid, $gid, $file); }
-                        else {
+                        if (! -l $file) {
+                            $check = chown($uid, $gid, $file);
+                        } else {
                             my $cmd = join(" ", ("chgrp", "-h", escapeshellarg($gid), escapeshellarg("./$file"), "2>&1"));
                             `$cmd`; $check = ($? == 0);
                         }
+                    } else {
+                        $check = 1;
                     }
-                    else { $check = 1; }
                     warn "warn: `$File' cannot set gid to '$gid'\n" if !$check;
                 }
             }
@@ -917,8 +894,9 @@ sub apply {
                 if (!$argv{'dry-run'}) {
                     my $cmd = join(" ", ("setfacl", "-bm", escapeshellarg($data{'acl'}), escapeshellarg("./$file"), "2>&1"));
                     `$cmd`; $check = ($? == 0);
+                } else {
+                    $check = 1;
                 }
-                else { $check = 1; }
                 warn "warn: `$File' cannot set acl to '$data{'acl'}'\n" if !$check;
             }
             if ($fields_used{'mtime'} && $data{'mtime'} ne "") {
@@ -926,13 +904,15 @@ sub apply {
                 my $atime = (lstat($file))[8];
                 print "`$File' set mtime to '$data{'mtime'}'\n" if $argv{'verbose'};
                 if (!$argv{'dry-run'}) {
-                    if (! -l $file) { $check = utime($atime, $mtime, $file); }
-                    else {
+                    if (! -l $file) {
+                        $check = utime($atime, $mtime, $file);
+                    } else {
                         my $cmd = join(" ", ("touch", "-hcmd", escapeshellarg($data{'mtime'}), escapeshellarg("./$file"), "2>&1"));
                         `$cmd`; $check = ($? == 0);
                     }
+                } else {
+                    $check = 1;
                 }
-                else { $check = 1; }
                 warn "warn: `$File' cannot set mtime to '$data{'mtime'}'\n" if !$check;
             }
             if ($fields_used{'atime'} && $data{'atime'} ne "") {
@@ -940,19 +920,20 @@ sub apply {
                 my $atime = gmtime_to_timestamp($data{'atime'});
                 print "`$File' set atime to '$data{'atime'}'\n" if $argv{'verbose'};
                 if (!$argv{'dry-run'}) {
-                    if (! -l $file) { $check = utime($atime, $mtime, $file); }
-                    else {
+                    if (! -l $file) {
+                        $check = utime($atime, $mtime, $file);
+                    } else {
                         my $cmd = join(" ", ("touch", "-hcad", escapeshellarg($data{'atime'}), escapeshellarg("./$file"), "2>&1"));
                         `$cmd`; $check = ($? == 0);
                     }
+                } else {
+                    $check = 1;
                 }
-                else { $check = 1; }
                 warn "warn: `$File' cannot set atime to '$data{'atime'}'\n" if !$check;
             }
         }
         close(GIT_STORE_META_FILE);
-    }
-    else {
+    } else {
         die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
     }
 }
