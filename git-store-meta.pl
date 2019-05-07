@@ -178,7 +178,7 @@ if ($topdir) {
 # init paths and header info
 $git_store_meta_filename = defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME;
 $git_store_meta_file = rel2abs($git_store_meta_filename);
-$temp_file = catfile($gitdir, $GIT_STORE_META_FILENAME . ".tmp" . time);
+$temp_file = catfile($gitdir, $GIT_STORE_META_FILENAME . ".tmp");
 get_cache_header_info();
 
 # handle action: store, update, apply
