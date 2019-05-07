@@ -61,7 +61,7 @@ Getopt::Long::Configure qw(gnu_getopt);
 use Cwd;
 use File::Basename;
 use File::Copy qw(copy);
-use File::Spec::Functions qw(rel2abs abs2rel);
+use File::Spec::Functions qw(rel2abs abs2rel catfile);
 use POSIX qw(strftime);
 use Time::Local;
 
@@ -177,7 +177,7 @@ if ($topdir) {
 # init paths and header info
 $git_store_meta_filename = defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME;
 $git_store_meta_file = rel2abs($git_store_meta_filename);
-$temp_file = $git_store_meta_file . ".tmp" . time;
+$temp_file = catfile($gitdir, $GIT_STORE_META_FILENAME . ".tmp" . time);
 get_cache_header_info();
 
 # handle action: store, update, apply
