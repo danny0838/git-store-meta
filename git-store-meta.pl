@@ -61,6 +61,7 @@ Getopt::Long::Configure qw(gnu_getopt);
 use Cwd;
 use File::Basename;
 use File::Copy qw(copy);
+use File::Path qw(make_path);
 use File::Spec::Functions qw(rel2abs abs2rel catfile);
 use POSIX qw(strftime);
 use Time::Local;
@@ -294,6 +295,7 @@ print "flags: " . $configs . "\n" if $configs;
 # do the action
 if ($action eq "store") {
     if (!$argv{'dry-run'}) {
+        make_path(dirname($git_store_meta_file));
         open(GIT_STORE_META_FILE, '>', $git_store_meta_file)
             or die "error: failed to write to `$git_store_meta_file': $!\n";
         select(GIT_STORE_META_FILE);
