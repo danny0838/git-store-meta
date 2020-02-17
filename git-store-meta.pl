@@ -35,6 +35,11 @@
 #   -t|--target FILE   Specify another filename to store metadata. Defaults to
 #                      ".git_store_meta" in the root of the working tree.
 #                      (available for: --store, --update, --apply, --install)
+#   -m|--multithread   Use a multi-threading applying data, 
+#                      Number of threads is deduced from system 
+#                      NUMBER_OF_PROCESSORS on Win, '/proc/cpuinfo' on Linux, 'sysctl -n hw.logicalcpu' on Mac
+#                      For custom threads count you can use env. variable GSM_THREAD_COUNT 
+#                      (available for: --apply, --install)
 #
 # FIELDs is a comma-separated string consisting of the following values:
 #   mtime   last modified time
@@ -54,6 +59,8 @@
 
 use utf8;
 use strict;
+use threads;
+use threads::shared;
 
 use version; our $VERSION = version->declare("v2.0.1");
 use Getopt::Long;
@@ -82,7 +89,7 @@ my $action;
 my $gitdir;
 my $topdir;
 
-my $git_store_meta_filename;
+my $git_store_meta_filename :shared;
 my $git_store_meta_file;
 my $git_store_meta_header;
 my $temp_file;
@@ -93,40 +100,42 @@ my $cache_header_valid = 0;
 my $cache_app;
 my $cache_version;
 my %cache_configs;
-my @cache_fields;
+my @cache_fields :shared;
 
 my $configs;
 
 # parse arguments
 my %argv = (
-    "store"      => 0,
-    "update"     => 0,
-    "apply"      => 0,
-    "install"    => 0,
-    "help"       => 0,
-    "version"    => 0,
-    "target"     => undef,
-    "fields"     => undef,
-    "directory"  => undef,
-    "topdir"     => undef,
-    "force"      => 0,
-    "dry-run"    => 0,
-    "verbose"    => 0,
+    "store"       => 0,
+    "update"      => 0,
+    "apply"       => 0,
+    "install"     => 0,
+    "help"        => 0,
+    "version"     => 0,
+    "target"      => undef,
+    "fields"      => undef,
+    "directory"   => undef,
+    "topdir"      => undef,
+    "force"       => 0,
+    "dry-run"     => 0,
+    "verbose"     => 0,
+    "multithread" => undef,
 );
 GetOptions(
-    "store|s"      => \$argv{'store'},
-    "update|u"     => \$argv{'update'},
-    "apply|a"      => \$argv{'apply'},
-    "install|i"    => \$argv{'install'},
-    "help|h"       => \$argv{'help'},
-    "version"      => \$argv{'version'},
-    "fields|f=s"   => \@{$argv{'fields'}},
-    "directory|d!" => \$argv{'directory'},
-    "topdir!"      => \$argv{'topdir'},
-    "force"        => \$argv{'force'},
-    "dry-run|n"    => \$argv{'dry-run'},
-    "verbose|v"    => \$argv{'verbose'},
-    "target|t=s"   => \$argv{'target'},
+    "store|s"         => \$argv{'store'},
+    "update|u"        => \$argv{'update'},
+    "apply|a"         => \$argv{'apply'},
+    "install|i"       => \$argv{'install'},
+    "help|h"          => \$argv{'help'},
+    "version"         => \$argv{'version'},
+    "fields|f=s"      => \@{$argv{'fields'}},
+    "directory|d!"    => \$argv{'directory'},
+    "topdir!"         => \$argv{'topdir'},
+    "force"           => \$argv{'force'},
+    "dry-run|n"       => \$argv{'dry-run'},
+    "verbose|v"       => \$argv{'verbose'},
+    "target|t=s"      => \$argv{'target'},
+    "multithread|m"   => \$argv{'multithread'},
 );
 
 # determine action
@@ -408,6 +417,7 @@ sub install_hooks {
     my $t;
     my $f = defined($argv{'target'}) ? " -t " . escapeshellarg($argv{'target'}) : "";
     my $f2 = escapeshellarg(defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME);
+    my $mt = defined($argv{'multithread'}) ? "-m " : "";
 
     $t = "$gitdir/hooks/pre-commit";
     open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
@@ -434,7 +444,7 @@ EOF
 
     $t = "$gitdir/hooks/post-checkout";
     open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
-    printf FILE <<'EOF', $f;
+    printf FILE <<'EOF', $mt, $f;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
@@ -447,7 +457,7 @@ change_br=$3
 
 # apply metadata only when HEAD is changed
 if [ ${sha_new} != ${sha_old} ]; then
-    "$script" --apply%s
+    "$script" %s--apply%s
 fi
 EOF
     close(FILE);
@@ -456,7 +466,7 @@ EOF
 
     $t = "$gitdir/hooks/post-merge";
     open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
-    printf FILE <<'EOF', $f;
+    printf FILE <<'EOF', $mt, $f;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
@@ -467,7 +477,7 @@ is_squash=$1
 
 # apply metadata after a successful non-squash merge
 if [ $is_squash -eq 0 ]; then
-    "$script" --apply%s
+    "$script" %s--apply%s
 fi
 EOF
     close(FILE);
@@ -734,189 +744,249 @@ sub update {
     close(CMD);
 }
 
+sub get_max_thread_count {
+    my $count = $ENV{"GSM_THREAD_COUNT"};
+    if (defined($count) && $count < 1) {
+        return 1;
+    }
+
+    #MS Windows - 
+    $count = $ENV{"NUMBER_OF_PROCESSORS"};
+    if (defined($count) && $count > 0) {
+        return $count;
+    }
+    
+    #linux
+    if (open my $handle, "/proc/cpuinfo") {
+        $count = scalar (map /^processor/, <$handle>);
+        close $handle;
+        return $count;
+    }
+    
+    #mac
+    if ($^O eq 'darwin') {
+    	$count = `sysctl -n hw.logicalcpu`;
+    	chomp($count);
+    	if ($count eq $count+0 && $count > 0) {
+    		return $count;
+    	}
+    }
+    
+    return 1;
+}
+
 sub apply {
     my @fields = @{$argv{'fields'}};
     my %fields_used = map { $_ => 1 } @fields;
+    
+    open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
+    chomp(my @lines = <GIT_STORE_META_FILE>);
+    close(GIT_STORE_META_FILE);
 
     # v1.0.0 ~ v2.0.* share same apply procedure
     # (files with a bad file name recorded in 1.0.* will be skipped)
     if (1.0.0 <= $cache_version && $cache_version < 2.1.0) {
-        my $count = 0;
-        open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
-        while (<GIT_STORE_META_FILE>) {
-            next if ++$count <= 2;  # skip first 2 lines (header)
-            s/^\s+//; s/\s+$//;
-            next if $_ eq "";
-
-            # for each line, parse the record
-            my @rec = split("\t");
-            my %data;
-            for (my $i=0; $i<=$#cache_fields; $i++) {
-                $data{$cache_fields[$i]} = $rec[$i];
+        @lines = @lines[2 .. @lines];
+        if ($argv{'multithread'}) {
+            my $numberofcores = get_max_thread_count();
+            print "Max available thread count: $numberofcores...\n";
+            my $count = @lines;
+            my $chunk_size = int($count/$numberofcores) + 1;
+            $chunk_size = 20 if ($chunk_size < 20);
+            while (@lines > $chunk_size) {
+                my @chunk = @lines[0 .. $chunk_size];
+                @lines = @lines[$chunk_size .. @lines];
+                threads->create(\&apply_chunk, \%fields_used, \@chunk);
             }
-
-            # check for existence and type
-            my $File = $data{'file'};  # escaped version, for printing
-            my $file = unescape_filename($File);  # unescaped version, for using
-            next if $file eq $git_store_meta_filename;  # skip data file
-            if (! -e $file && ! -l $file) {  # -e tests symlink target instead of the symlink itself
-                warn "warn: `$File' does not exist, skip applying metadata\n";
-                next;
+            threads->create(\&apply_chunk, \%fields_used, \@lines) if (@lines > 0);
+            
+            #now we need to wait for all threads
+            foreach my $thr (threads->list()) {
+                $thr->join();
             }
-            my $type = $data{'type'};
-            # a symbolic link could be checked out as a plain file, simply see them as equal
-            if ($type eq "f" || $type eq "l" ) {
-                if (! -f $file && ! -l $file) {
-                    warn "warn: `$File' is not a file, skip applying metadata\n";
-                    next;
-                }
-            } elsif ($type eq "d") {
-                if (! -d $file) {
-                    warn "warn: `$File' is not a directory, skip applying metadata\n";
-                    next;
-                }
-                if (!$argv{'directory'}) {
-                    next;
-                }
-                if ($file eq "." && !$argv{'topdir'}) {
-                    next;
-                }
-            } else {
-                warn "warn: `$File' is recorded as an unknown type, skip applying metadata\n";
-                next;
-            }
-
-            # apply metadata
-            my $check = 0;
-            set_user: {
-                if ($fields_used{'user'} && $data{'user'} ne "") {
-                    my $uid = (getpwnam($data{'user'}))[2];
-                    my $gid = (lstat($file))[5];
-                    print "`$File' set user to '$data{'user'}'\n" if $argv{'verbose'};
-                    if (defined $uid) {
-                        if (!$argv{'dry-run'}) {
-                            if (! -l $file) {
-                                $check = chown($uid, $gid, $file);
-                            } else {
-                                my $cmd = join(" ", ("chown", "-h", escapeshellarg($data{'user'}), escapeshellarg("./$file"), "2>&1"));
-                                `$cmd`; $check = ($? == 0);
-                            }
-                        } else {
-                            $check = 1;
-                        }
-                        warn "warn: `$File' cannot set user to '$data{'user'}'\n" if !$check;
-                        last set_user if $check;
-                    } else {
-                        warn "warn: $data{'user'} is not a valid user.\n";
-                    }
-                }
-                if ($fields_used{'uid'} && $data{'uid'} ne "") {
-                    my $uid = $data{'uid'};
-                    my $gid = (lstat($file))[5];
-                    print "`$File' set uid to '$uid'\n" if $argv{'verbose'};
-                    if (!$argv{'dry-run'}) {
-                        if (! -l $file) {
-                            $check = chown($uid, $gid, $file);
-                        } else {
-                            my $cmd = join(" ", ("chown", "-h", escapeshellarg($uid), escapeshellarg("./$file"), "2>&1"));
-                            `$cmd`; $check = ($? == 0);
-                        }
-                    } else {
-                        $check = 1;
-                    }
-                    warn "warn: `$File' cannot set uid to '$uid'\n" if !$check;
-                }
-            }
-            set_group: {
-                if ($fields_used{'group'} && $data{'group'} ne "") {
-                    my $uid = (lstat($file))[4];
-                    my $gid = (getgrnam($data{'group'}))[2];
-                    print "`$File' set group to '$data{'group'}'\n" if $argv{'verbose'};
-                    if (defined $gid) {
-                        if (!$argv{'dry-run'}) {
-                            if (! -l $file) {
-                                $check = chown($uid, $gid, $file);
-                            } else {
-                                my $cmd = join(" ", ("chgrp", "-h", escapeshellarg($data{'group'}), escapeshellarg("./$file"), "2>&1"));
-                                `$cmd`; $check = ($? == 0);
-                            }
-                        } else {
-                            $check = 1;
-                        }
-                        warn "warn: `$File' cannot set group to '$data{'group'}'\n" if !$check;
-                        last set_group if $check;
-                    } else {
-                        warn "warn: $data{'group'} is not a valid user group.\n";
-                    }
-                }
-                if ($fields_used{'gid'} && $data{'gid'} ne "") {
-                    my $uid = (lstat($file))[4];
-                    my $gid = $data{'gid'};
-                    print "`$File' set gid to '$gid'\n" if $argv{'verbose'};
-                    if (!$argv{'dry-run'}) {
-                        if (! -l $file) {
-                            $check = chown($uid, $gid, $file);
-                        } else {
-                            my $cmd = join(" ", ("chgrp", "-h", escapeshellarg($gid), escapeshellarg("./$file"), "2>&1"));
-                            `$cmd`; $check = ($? == 0);
-                        }
-                    } else {
-                        $check = 1;
-                    }
-                    warn "warn: `$File' cannot set gid to '$gid'\n" if !$check;
-                }
-            }
-            if ($fields_used{'mode'} && $data{'mode'} ne "" && ! -l $file) {
-                my $mode = oct($data{'mode'}) & 07777;
-                print "`$File' set mode to '$data{'mode'}'\n" if $argv{'verbose'};
-                $check = !$argv{'dry-run'} ? chmod($mode, $file) : 1;
-                warn "warn: `$File' cannot set mode to '$data{'mode'}'\n" if !$check;
-            }
-            if ($fields_used{'acl'} && $data{'acl'} ne "") {
-                print "`$File' set acl to '$data{'acl'}'\n" if $argv{'verbose'};
-                if (!$argv{'dry-run'}) {
-                    my $cmd = join(" ", ("setfacl", "-bm", escapeshellarg($data{'acl'}), escapeshellarg("./$file"), "2>&1"));
-                    `$cmd`; $check = ($? == 0);
-                } else {
-                    $check = 1;
-                }
-                warn "warn: `$File' cannot set acl to '$data{'acl'}'\n" if !$check;
-            }
-            if ($fields_used{'mtime'} && $data{'mtime'} ne "") {
-                my $mtime = gmtime_to_timestamp($data{'mtime'});
-                my $atime = (lstat($file))[8];
-                print "`$File' set mtime to '$data{'mtime'}'\n" if $argv{'verbose'};
-                if (!$argv{'dry-run'}) {
-                    if (! -l $file) {
-                        $check = utime($atime, $mtime, $file);
-                    } else {
-                        my $cmd = join(" ", ("touch", "-hcmd", escapeshellarg($data{'mtime'}), escapeshellarg("./$file"), "2>&1"));
-                        `$cmd`; $check = ($? == 0);
-                    }
-                } else {
-                    $check = 1;
-                }
-                warn "warn: `$File' cannot set mtime to '$data{'mtime'}'\n" if !$check;
-            }
-            if ($fields_used{'atime'} && $data{'atime'} ne "") {
-                my $mtime = (lstat($file))[9];
-                my $atime = gmtime_to_timestamp($data{'atime'});
-                print "`$File' set atime to '$data{'atime'}'\n" if $argv{'verbose'};
-                if (!$argv{'dry-run'}) {
-                    if (! -l $file) {
-                        $check = utime($atime, $mtime, $file);
-                    } else {
-                        my $cmd = join(" ", ("touch", "-hcad", escapeshellarg($data{'atime'}), escapeshellarg("./$file"), "2>&1"));
-                        `$cmd`; $check = ($? == 0);
-                    }
-                } else {
-                    $check = 1;
-                }
-                warn "warn: `$File' cannot set atime to '$data{'atime'}'\n" if !$check;
-            }
-        }
-        close(GIT_STORE_META_FILE);
+        } else {
+            apply_chunk(\%fields_used, \@lines);
+        }            
     } else {
         die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
+    }
+}
+
+sub apply_chunk {
+    my ($ref_fields_used, $ref_lines) = (@_);
+    my %fields_used = %$ref_fields_used;
+    my @lines = @$ref_lines;
+
+    foreach (@lines) {
+        next if (!defined($_));
+        s/^\s+//; s/\s+$//;
+        next if $_ eq "";
+
+        # for each line, parse the record
+        my @rec = split("\t");
+        my %data;
+        for (my $i=0; $i<=$#cache_fields; $i++) {
+            $data{$cache_fields[$i]} = $rec[$i];
+        }
+
+        # check for existence and type
+        my $File = $data{'file'};  # escaped version, for printing
+        my $file = unescape_filename($File);  # unescaped version, for using
+        next if $file eq $git_store_meta_filename;  # skip data file
+        if (! -e $file && ! -l $file) {  # -e tests symlink target instead of the symlink itself
+            warn "warn: `$File' does not exist, skip applying metadata\n";
+            next;
+        }
+        my $type = $data{'type'};
+        # a symbolic link could be checked out as a plain file, simply see them as equal
+        if ($type eq "f" || $type eq "l" ) {
+            if (! -f $file && ! -l $file) {
+                warn "warn: `$File' is not a file, skip applying metadata\n";
+                next;
+            }
+        } elsif ($type eq "d") {
+            if (! -d $file) {
+                warn "warn: `$File' is not a directory, skip applying metadata\n";
+                next;
+            }
+            if (!$argv{'directory'}) {
+                next;
+            }
+            if ($file eq "." && !$argv{'topdir'}) {
+                next;
+            }
+        } else {
+            warn "warn: `$File' is recorded as an unknown type, skip applying metadata\n";
+            next;
+        }
+
+        # apply metadata
+        my $check = 0;
+        set_user: {
+            if ($fields_used{'user'} && $data{'user'} ne "") {
+                my $uid = (getpwnam($data{'user'}))[2];
+                my $gid = (lstat($file))[5];
+                print "`$File' set user to '$data{'user'}'\n" if $argv{'verbose'};
+                if (defined $uid) {
+                    if (!$argv{'dry-run'}) {
+                        if (! -l $file) {
+                            $check = chown($uid, $gid, $file);
+                        } else {
+                            my $cmd = join(" ", ("chown", "-h", escapeshellarg($data{'user'}), escapeshellarg("./$file"), "2>&1"));
+                            `$cmd`; $check = ($? == 0);
+                        }
+                    } else {
+                        $check = 1;
+                    }
+                    warn "warn: `$File' cannot set user to '$data{'user'}'\n" if !$check;
+                    last set_user if $check;
+                } else {
+                    warn "warn: $data{'user'} is not a valid user.\n";
+                }
+            }
+            if ($fields_used{'uid'} && $data{'uid'} ne "") {
+                my $uid = $data{'uid'};
+                my $gid = (lstat($file))[5];
+                print "`$File' set uid to '$uid'\n" if $argv{'verbose'};
+                if (!$argv{'dry-run'}) {
+                    if (! -l $file) {
+                        $check = chown($uid, $gid, $file);
+                    } else {
+                        my $cmd = join(" ", ("chown", "-h", escapeshellarg($uid), escapeshellarg("./$file"), "2>&1"));
+                        `$cmd`; $check = ($? == 0);
+                    }
+                } else {
+                    $check = 1;
+                }
+                warn "warn: `$File' cannot set uid to '$uid'\n" if !$check;
+            }
+        }
+        set_group: {
+            if ($fields_used{'group'} && $data{'group'} ne "") {
+                my $uid = (lstat($file))[4];
+                my $gid = (getgrnam($data{'group'}))[2];
+                print "`$File' set group to '$data{'group'}'\n" if $argv{'verbose'};
+                if (defined $gid) {
+                    if (!$argv{'dry-run'}) {
+                        if (! -l $file) {
+                            $check = chown($uid, $gid, $file);
+                        } else {
+                            my $cmd = join(" ", ("chgrp", "-h", escapeshellarg($data{'group'}), escapeshellarg("./$file"), "2>&1"));
+                            `$cmd`; $check = ($? == 0);
+                        }
+                    } else {
+                        $check = 1;
+                    }
+                    warn "warn: `$File' cannot set group to '$data{'group'}'\n" if !$check;
+                    last set_group if $check;
+                } else {
+                    warn "warn: $data{'group'} is not a valid user group.\n";
+                }
+            }
+            if ($fields_used{'gid'} && $data{'gid'} ne "") {
+                my $uid = (lstat($file))[4];
+                my $gid = $data{'gid'};
+                print "`$File' set gid to '$gid'\n" if $argv{'verbose'};
+                if (!$argv{'dry-run'}) {
+                    if (! -l $file) {
+                        $check = chown($uid, $gid, $file);
+                    } else {
+                        my $cmd = join(" ", ("chgrp", "-h", escapeshellarg($gid), escapeshellarg("./$file"), "2>&1"));
+                        `$cmd`; $check = ($? == 0);
+                    }
+                } else {
+                    $check = 1;
+                }
+                warn "warn: `$File' cannot set gid to '$gid'\n" if !$check;
+            }
+        }
+        if ($fields_used{'mode'} && $data{'mode'} ne "" && ! -l $file) {
+            my $mode = oct($data{'mode'}) & 07777;
+            print "`$File' set mode to '$data{'mode'}'\n" if $argv{'verbose'};
+            $check = !$argv{'dry-run'} ? chmod($mode, $file) : 1;
+            warn "warn: `$File' cannot set mode to '$data{'mode'}'\n" if !$check;
+        }
+        if ($fields_used{'acl'} && $data{'acl'} ne "") {
+            print "`$File' set acl to '$data{'acl'}'\n" if $argv{'verbose'};
+            if (!$argv{'dry-run'}) {
+                my $cmd = join(" ", ("setfacl", "-bm", escapeshellarg($data{'acl'}), escapeshellarg("./$file"), "2>&1"));
+                `$cmd`; $check = ($? == 0);
+            } else {
+                $check = 1;
+            }
+            warn "warn: `$File' cannot set acl to '$data{'acl'}'\n" if !$check;
+        }
+        if ($fields_used{'mtime'} && $data{'mtime'} ne "") {
+            my $mtime = gmtime_to_timestamp($data{'mtime'});
+            my $atime = (lstat($file))[8];
+            print "`$File' set mtime to '$data{'mtime'}'\n" if $argv{'verbose'};
+            if (!$argv{'dry-run'}) {
+                if (! -l $file) {
+                    $check = utime($atime, $mtime, $file);
+                } else {
+                    my $cmd = join(" ", ("touch", "-hcmd", escapeshellarg($data{'mtime'}), escapeshellarg("./$file"), "2>&1"));
+                    `$cmd`; $check = ($? == 0);
+                }
+            } else {
+                $check = 1;
+            }
+            warn "warn: `$File' cannot set mtime to '$data{'mtime'}'\n" if !$check;
+        }
+        if ($fields_used{'atime'} && $data{'atime'} ne "") {
+            my $mtime = (lstat($file))[9];
+            my $atime = gmtime_to_timestamp($data{'atime'});
+            print "`$File' set atime to '$data{'atime'}'\n" if $argv{'verbose'};
+            if (!$argv{'dry-run'}) {
+                if (! -l $file) {
+                    $check = utime($atime, $mtime, $file);
+                } else {
+                    my $cmd = join(" ", ("touch", "-hcad", escapeshellarg($data{'atime'}), escapeshellarg("./$file"), "2>&1"));
+                    `$cmd`; $check = ($? == 0);
+                }
+            } else {
+                $check = 1;
+            }
+            warn "warn: `$File' cannot set atime to '$data{'atime'}'\n" if !$check;
+        }
     }
 }
