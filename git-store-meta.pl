@@ -35,11 +35,11 @@
 #   -t|--target FILE   Specify another filename to store metadata. Defaults to
 #                      ".git_store_meta" in the root of the working tree.
 #                      (available for: --store, --update, --apply, --install)
-#   -m|--multithread   Use a multi-threading applying data, 
-#                      Number of threads is deduced from system 
-#                      NUMBER_OF_PROCESSORS on Win, '/proc/cpuinfo' on Linux, 'sysctl -n hw.logicalcpu' on Mac
-#                      For custom threads count you can use env. variable GSM_THREAD_COUNT 
+#   --mt               Use a multi-threading applying data, max. count of threads
+#                      is deduced from system
 #                      (available for: --apply, --install)
+#   --mt-count         Use it to specify your own max. count of threads
+#                      it must be used together with '--mt' option
 #
 # FIELDs is a comma-separated string consisting of the following values:
 #   mtime   last modified time
@@ -119,7 +119,8 @@ my %argv = (
     "force"       => 0,
     "dry-run"     => 0,
     "verbose"     => 0,
-    "multithread" => undef,
+    "mt"          => undef,
+    "mt-count"    => 0,
 );
 GetOptions(
     "store|s"         => \$argv{'store'},
@@ -135,7 +136,8 @@ GetOptions(
     "dry-run|n"       => \$argv{'dry-run'},
     "verbose|v"       => \$argv{'verbose'},
     "target|t=s"      => \$argv{'target'},
-    "multithread|m"   => \$argv{'multithread'},
+    "mt"              => \$argv{'mt'},
+    "mt-count=i"      => \$argv{'mt-count'},
 );
 
 # determine action
@@ -417,7 +419,8 @@ sub install_hooks {
     my $t;
     my $f = defined($argv{'target'}) ? " -t " . escapeshellarg($argv{'target'}) : "";
     my $f2 = escapeshellarg(defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME);
-    my $mt = defined($argv{'multithread'}) ? "-m " : "";
+    my $mt_count = defined($argv{'mt-count'}) ? "--mt-count ".$argv{'mt-count'} : "";
+    my $mt = defined($argv{'mt'}) ? "--m ".$mt_count." " : "";
 
     $t = "$gitdir/hooks/pre-commit";
     open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
@@ -745,24 +748,23 @@ sub update {
 }
 
 sub get_max_thread_count {
-    my $count = $ENV{"GSM_THREAD_COUNT"};
-    if (defined($count) && $count < 1) {
-        return 1;
+    if ($argv{'mt-count'}) {
+        my $count = $argv{'mt-count'};
+        if ($count eq $count+0 && $count > 0) {
+    		return $count;
+    	}
     }
-
-    #MS Windows - 
-    $count = $ENV{"NUMBER_OF_PROCESSORS"};
+    #MS Windows -
+    my $count = $ENV{"NUMBER_OF_PROCESSORS"};
     if (defined($count) && $count > 0) {
         return $count;
     }
-    
     #linux
     if (open my $handle, "/proc/cpuinfo") {
         $count = scalar (map /^processor/, <$handle>);
         close $handle;
         return $count;
     }
-    
     #mac
     if ($^O eq 'darwin') {
     	$count = `sysctl -n hw.logicalcpu`;
@@ -771,14 +773,13 @@ sub get_max_thread_count {
     		return $count;
     	}
     }
-    
     return 1;
 }
 
 sub apply {
     my @fields = @{$argv{'fields'}};
     my %fields_used = map { $_ => 1 } @fields;
-    
+
     open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
     chomp(my @lines = <GIT_STORE_META_FILE>);
     close(GIT_STORE_META_FILE);
@@ -787,7 +788,7 @@ sub apply {
     # (files with a bad file name recorded in 1.0.* will be skipped)
     if (1.0.0 <= $cache_version && $cache_version < 2.1.0) {
         @lines = @lines[2 .. @lines];
-        if ($argv{'multithread'}) {
+        if ($argv{'mt'}) {
             my $numberofcores = get_max_thread_count();
             print "Max available thread count: $numberofcores...\n";
             my $count = @lines;
@@ -799,14 +800,13 @@ sub apply {
                 threads->create(\&apply_chunk, \%fields_used, \@chunk);
             }
             threads->create(\&apply_chunk, \%fields_used, \@lines) if (@lines > 0);
-            
             #now we need to wait for all threads
             foreach my $thr (threads->list()) {
                 $thr->join();
             }
         } else {
             apply_chunk(\%fields_used, \@lines);
-        }            
+        }
     } else {
         die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
     }
@@ -816,7 +816,6 @@ sub apply_chunk {
     my ($ref_fields_used, $ref_lines) = (@_);
     my %fields_used = %$ref_fields_used;
     my @lines = @$ref_lines;
-
     foreach (@lines) {
         next if (!defined($_));
         s/^\s+//; s/\s+$//;
