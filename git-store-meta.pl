@@ -127,7 +127,7 @@ GetOptions(
     "dry-run|n"    => \$argv{'dry-run'},
     "verbose|v"    => \$argv{'verbose'},
     "target|t=s"   => \$argv{'target'},
-);
+) or die;
 
 # determine action
 foreach (@ACTIONS) {
