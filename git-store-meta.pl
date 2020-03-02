@@ -95,10 +95,8 @@ my $cache_version;
 my %cache_configs;
 my @cache_fields;
 
-my $touchm;
-my $toucha;
+my $touch;
 my $chown;
-my $chgrp;
 
 my $configs;
 
@@ -281,15 +279,11 @@ fix_configs: {
 
 prepare_subroutines: {
     if (eval { require File::lchown; }) {
-        $touchm = \&touchm_internal;
-        $toucha = \&toucha_internal;
+        $touch = \&touch_internal;
         $chown = \&chown_internal;
-        $chgrp = \&chgrp_internal;
     } else {
-        $touchm = \&touchm_external;
-        $toucha = \&toucha_external;
+        $touch = \&touch_external;
         $chown = \&chown_external;
-        $chgrp = \&chgrp_external;
     }
 }
 
@@ -390,75 +384,48 @@ sub unescape_filename {
     return $str;
 }
 
-sub touchm_internal {
-    my ($mtime, $file) = @_;
-    $mtime = gmtime_to_timestamp($mtime);
-    my $atime = (lstat($file))[8];
+sub touch_internal {
+    my ($atime, $mtime, $file) = @_;
+    $atime = $atime ? gmtime_to_timestamp($atime) : (lstat($file))[8];
+    $mtime = $mtime ? gmtime_to_timestamp($mtime) : (lstat($file))[9];
     return File::lchown::lutimes($atime, $mtime, $file);
 }
 
-sub touchm_external {
-    my ($mtime, $file) = @_;
+sub touch_external {
+    my ($atime, $mtime, $file) = @_;
     if (-l $file) {
-        my $cmd = join(" ", ("touch", "-hcmd", escapeshellarg($mtime), escapeshellarg("./$file"), "2>&1"));
+        my @cmds;
+        if ($atime) {
+            push(@cmds, join(" ", ("touch", "-hcad", escapeshellarg($atime), escapeshellarg("./$file"), "2>&1")));
+        }
+        if ($mtime) {
+            push(@cmds, join(" ", ("touch", "-hcmd", escapeshellarg($mtime), escapeshellarg("./$file"), "2>&1")));
+        }
+        my $cmd = join(' && ', @cmds);
         `$cmd`;
         return ($? == 0);
     }
-    $mtime = gmtime_to_timestamp($mtime);
-    my $atime = (lstat($file))[8];
-    return utime($atime, $mtime, $file);
-}
-
-sub toucha_internal {
-    my ($atime, $file) = @_;
-    $atime = gmtime_to_timestamp($atime);
-    my $mtime = (lstat($file))[9];
-    return File::lchown::lutimes($atime, $mtime, $file);
-}
-
-sub toucha_external {
-    my ($atime, $file) = @_;
-    if (-l $file) {
-        my $cmd = join(" ", ("touch", "-hcad", escapeshellarg($atime), escapeshellarg("./$file"), "2>&1"));
-        `$cmd`;
-        return ($? == 0);
-    }
-    $atime = gmtime_to_timestamp($atime);
-    my $mtime = (lstat($file))[9];
+    $atime = $atime ? gmtime_to_timestamp($atime) : (lstat($file))[8];
+    $mtime = $mtime ? gmtime_to_timestamp($mtime) : (lstat($file))[9];
     return utime($atime, $mtime, $file);
 }
 
 sub chown_internal {
-    my ($uid, $file) = @_;
-    my $gid = (lstat($file))[5];
+    my ($uid, $gid, $file) = @_;
+    $uid = defined($uid) ? $uid : (lstat($file))[4];
+    $gid = defined($gid) ? $gid : (lstat($file))[5];
     return File::lchown::lchown($uid, $gid, $file);
 }
 
 sub chown_external {
-    my ($uid, $file) = @_;
+    my ($uid, $gid, $file) = @_;
     if (-l $file) {
-        my $cmd = join(" ", ("chown", "-h", escapeshellarg($uid), escapeshellarg("./$file"), "2>&1"));
+        my $cmd = join(" ", ("chown", "-h", escapeshellarg($uid).':'.escapeshellarg($gid), escapeshellarg("./$file"), "2>&1"));
         `$cmd`;
         return ($? == 0);
     }
-    my $gid = (lstat($file))[5];
-    return chown($uid, $gid, $file);
-}
-
-sub chgrp_internal {
-    my ($gid, $file) = @_;
-    my $uid = (lstat($file))[4];
-    return File::lchown::lchown($uid, $gid, $file);
-}
-
-sub chgrp_external {
-    my ($gid, $file) = @_;
-    if (-l $file) {
-        my $cmd = join(" ", ("chgrp", "-h", escapeshellarg($gid), escapeshellarg("./$file"), "2>&1"));
-        `$cmd`;
-        return ($? == 0);
-    }
-    my $uid = (lstat($file))[4];
+    $uid = defined($uid) ? $uid : (lstat($file))[4];
+    $gid = defined($gid) ? $gid : (lstat($file))[5];
     return chown($uid, $gid, $file);
 }
 
@@ -889,93 +856,71 @@ sub apply {
 
             # apply metadata
             my $check = 0;
-            set_user: {
+            if (($fields_used{'user'} && $data{'user'} ne "") || 
+                    ($fields_used{'uid'} && $data{'uid'} ne "") || 
+                    ($fields_used{'group'} && $data{'group'} ne "") || 
+                    ($fields_used{'gid'} && $data{'gid'} ne "")) {
+                my $uid;
+                my $user; # for display
                 if ($fields_used{'user'} && $data{'user'} ne "") {
-                    print "`$File' set user to '$data{'user'}'\n" if $argv{'verbose'};
-                    my $uid = (getpwnam($data{'user'}))[2];
-                    if (defined $uid) {
-                        if (!$argv{'dry-run'}) {
-                            $check = &$chown($uid, $file);
-                        } else {
-                            $check = 1;
-                        }
-                        warn "warn: `$File' cannot set user to '$data{'user'}'\n" if !$check;
-                        last set_user if $check;
-                    } else {
-                        warn "warn: $data{'user'} is not a valid user.\n";
-                    }
+                    $user = $data{'user'};
+                    $uid = (getpwnam($data{'user'}))[2];
                 }
-                if ($fields_used{'uid'} && $data{'uid'} ne "") {
-                    my $uid = $data{'uid'};
-                    print "`$File' set uid to '$uid'\n" if $argv{'verbose'};
-                    if (!$argv{'dry-run'}) {
-                        $check = &$chown($uid, $file);
-                    } else {
-                        $check = 1;
-                    }
-                    warn "warn: `$File' cannot set uid to '$uid'\n" if !$check;
+                if (!defined($uid) && ($fields_used{'uid'} && $data{'uid'} ne "")) {
+                    $user = $data{'uid'};
+                    $uid = $data{'uid'};
                 }
-            }
-            set_group: {
+                $user = defined($uid) ? $user : "-";
+
+                my $gid;
+                my $group; # for display
                 if ($fields_used{'group'} && $data{'group'} ne "") {
-                    print "`$File' set group to '$data{'group'}'\n" if $argv{'verbose'};
-                    my $gid = (getgrnam($data{'group'}))[2];
-                    if (defined $gid) {
-                        if (!$argv{'dry-run'}) {
-                            $check = &$chgrp($gid, $file);
-                        } else {
-                            $check = 1;
-                        }
-                        warn "warn: `$File' cannot set group to '$data{'group'}'\n" if !$check;
-                        last set_group if $check;
-                    } else {
-                        warn "warn: $data{'group'} is not a valid user group.\n";
-                    }
+                    $group = $data{'group'};
+                    $gid = (getgrnam($data{'group'}))[2];
                 }
-                if ($fields_used{'gid'} && $data{'gid'} ne "") {
-                    my $gid = $data{'gid'};
-                    print "`$File' set gid to '$gid'\n" if $argv{'verbose'};
-                    if (!$argv{'dry-run'}) {
-                        $check = &$chgrp($gid, $file);
-                    } else {
-                        $check = 1;
-                    }
-                    warn "warn: `$File' cannot set gid to '$gid'\n" if !$check;
+                if (!defined($gid) && ($fields_used{'gid'} && $data{'gid'} ne "")) {
+                    $group = $data{'gid'};
+                    $gid = $data{'gid'};
                 }
+                $group = defined($gid) ? $group : "-";
+
+                print "`$File' set user/group to $user/$group\n" if $argv{'verbose'};
+                if (!$argv{'dry-run'}) {
+                    $check = (defined($uid) || defined($gid)) ? &$chown($uid, $gid, $file) : 1;
+                } else {
+                    $check = 1;
+                }
+                warn "warn: `$File' cannot set user/group to $user/$group\n" if !$check;
             }
             if ($fields_used{'mode'} && $data{'mode'} ne "" && ! -l $file) {
                 my $mode = oct($data{'mode'}) & 07777;
-                print "`$File' set mode to '$data{'mode'}'\n" if $argv{'verbose'};
+                print "`$File' set mode to $data{'mode'}\n" if $argv{'verbose'};
                 $check = !$argv{'dry-run'} ? chmod($mode, $file) : 1;
-                warn "warn: `$File' cannot set mode to '$data{'mode'}'\n" if !$check;
+                warn "warn: `$File' cannot set mode to $data{'mode'}\n" if !$check;
             }
             if ($fields_used{'acl'} && $data{'acl'} ne "") {
-                print "`$File' set acl to '$data{'acl'}'\n" if $argv{'verbose'};
+                print "`$File' set acl to $data{'acl'}\n" if $argv{'verbose'};
                 if (!$argv{'dry-run'}) {
                     my $cmd = join(" ", ("setfacl", "-Pbm", escapeshellarg($data{'acl'}), escapeshellarg("./$file"), "2>&1"));
                     `$cmd`; $check = ($? == 0);
                 } else {
                     $check = 1;
                 }
-                warn "warn: `$File' cannot set acl to '$data{'acl'}'\n" if !$check;
+                warn "warn: `$File' cannot set acl to $data{'acl'}\n" if !$check;
             }
-            if ($fields_used{'mtime'} && $data{'mtime'} ne "") {
-                print "`$File' set mtime to '$data{'mtime'}'\n" if $argv{'verbose'};
+            if (($fields_used{'mtime'} && $data{'mtime'} ne "") || 
+                    ($fields_used{'atime'} && $data{'atime'} ne "")) {
+                my $atime = $data{'atime'};
+                my $mtime = $data{'mtime'};
+                my $atime_ = $atime || '-';
+                my $mtime_ = $mtime || '-';
+                print "`$File' set atime/mtime to $atime_/$mtime_\n" if $argv{'verbose'};
                 if (!$argv{'dry-run'}) {
-                    $check = &$touchm($data{'mtime'}, $file);
+                    $check = &$touch($atime, $mtime, $file);
                 } else {
                     $check = 1;
                 }
-                warn "warn: `$File' cannot set mtime to '$data{'mtime'}'\n" if !$check;
-            }
-            if ($fields_used{'atime'} && $data{'atime'} ne "") {
-                print "`$File' set atime to '$data{'atime'}'\n" if $argv{'verbose'};
-                if (!$argv{'dry-run'}) {
-                    $check = &$toucha($data{'atime'}, $file);
-                } else {
-                    $check = 1;
-                }
-                warn "warn: `$File' cannot set atime to '$data{'atime'}'\n" if !$check;
+                warn "warn: `$File' cannot set atime/mtime to $atime_/$mtime_\n" if !$check;
             }
         }
         close(GIT_STORE_META_FILE);
