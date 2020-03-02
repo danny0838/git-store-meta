@@ -752,7 +752,7 @@ sub apply {
             my @rec = split("\t");
             my %data;
             for (my $i=0; $i<=$#cache_fields; $i++) {
-                $data{$cache_fields[$i]} = $rec[$i];
+                $data{$cache_fields[$i]} = defined($rec[$i]) ? $rec[$i] : "";
             }
 
             # check for existence and type
