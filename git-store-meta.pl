@@ -536,30 +536,40 @@ sub get_file_metadata {
     my @rec;
     my $type = get_file_type($file);
     return @rec if !$type;  # skip unsupported "file" types
+
+    # evaluate stat, which is almost always used
     my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = lstat($file);
-    my ($user) = getpwuid($uid);
-    my ($group) = getgrgid($gid);
-    $mtime = timestamp_to_gmtime($mtime);
-    $atime = timestamp_to_gmtime($atime);
-    $mode = sprintf("%04o", $mode & 07777);
-    $mode = "0664" if $type eq "l";  # symbolic do not apply mode, but use 0664 if checked out as a plain file
-    my $cmd = join(" ", ("getfacl", "-PcE", escapeshellarg("./$file"), "2>/dev/null"));
-    my $acl = `$cmd`; $acl =~ s/\n+$//; $acl =~ s/\n/,/g;
-    my %data = (
-        "file"  => escape_filename($file),
-        "type"  => $type,
-        "mtime" => $mtime,
-        "atime" => $atime,
-        "mode"  => $mode,
-        "uid"   => $uid,
-        "gid"   => $gid,
-        "user"  => $user,
-        "group" => $group,
-        "acl"   => $acl,
-    );
+
     # output formatted data
+    # @TODO: further optimization to prevent a possible long condition checking?
     foreach (@fields) {
-        push(@rec, defined($data{$_}) ? $data{$_} : "");
+        if ($_ eq "file") {
+            push(@rec, escape_filename($file));
+        } elsif ($_ eq "type") {
+            push(@rec, $type);
+        } elsif ($_ eq "mtime") {
+            push(@rec, timestamp_to_gmtime($mtime));
+        } elsif ($_ eq "atime") {
+            push(@rec, timestamp_to_gmtime($atime));
+        } elsif ($_ eq "mode") {
+            $mode = sprintf("%04o", $mode & 07777);
+            $mode = "0664" if $type eq "l";  # symlinks do not apply mode, but use 0664 if checked out as a plain file
+            push(@rec, $mode);
+        } elsif ($_ eq "uid") {
+            push(@rec, $uid);
+        } elsif ($_ eq "gid") {
+            push(@rec, $gid);
+        } elsif ($_ eq "user") {
+            my $user = getpwuid($uid);
+            push(@rec, $user || "");
+        } elsif ($_ eq "group") {
+            my $group = getpwuid($gid);
+            push(@rec, $group || "");
+        } elsif ($_ eq "acl") {
+            my $cmd = join(" ", ("getfacl", "-PcE", escapeshellarg("./$file"), "2>/dev/null"));
+            my $acl = `$cmd`; $acl =~ s/\n+$//; $acl =~ s/\n/,/g;
+            push(@rec, $acl);
+        }
     }
     return @rec;
 }
