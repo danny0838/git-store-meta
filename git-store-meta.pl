@@ -289,7 +289,14 @@ prepare_subroutines: {
     }
     if (eval { require Linux::ACL; }) {
         $getfacl = \&getfacl_internal;
-        $setfacl = \&setfacl_internal;
+
+        # Linux::ACL::setfacl (0.05) has an issue of adding "mask" field even
+        # when not specified, which breaks compatibility with setfacl. Disable
+        # it temporarily until it's fixed.
+        # https://github.com/nazarov-yuriy/Linux--ACL/issues/2
+        #
+        # $setfacl = \&setfacl_internal;
+        $setfacl = \&setfacl_external;
     } else {
         $getfacl = \&getfacl_external;
         $setfacl = \&setfacl_external;
