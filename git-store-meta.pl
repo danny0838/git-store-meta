@@ -97,6 +97,8 @@ my @cache_fields;
 
 my $touch;
 my $chown;
+my $getfacl;
+my $setfacl;
 
 my $configs;
 
@@ -285,6 +287,13 @@ prepare_subroutines: {
         $touch = \&touch_external;
         $chown = \&chown_external;
     }
+    if (eval { require Linux::ACL; }) {
+        $getfacl = \&getfacl_internal;
+        $setfacl = \&setfacl_internal;
+    } else {
+        $getfacl = \&getfacl_external;
+        $setfacl = \&setfacl_external;
+    }
 }
 
 # show settings
@@ -427,6 +436,123 @@ sub chown_external {
     $uid = defined($uid) ? $uid : (lstat($file))[4];
     $gid = defined($gid) ? $gid : (lstat($file))[5];
     return chown($uid, $gid, $file);
+}
+
+# Serialization: join lines with ","
+sub getfacl_internal {
+    my ($file) = @_;
+    if (-l $file) {
+        return "";
+    }
+    my @results;
+    my ($acl, $default_acl) = Linux::ACL::getfacl($file);
+    if (defined $acl) {
+        my %acl = %{$acl};
+        if (defined $acl{'uperm'}) {
+            push(@results, "user::" . getfacl_internal_getperms(\%{$acl{'uperm'}}));
+        }
+        if (defined $acl{'user'}) {
+            foreach my $uid (keys %{$acl{'user'}}) {
+                my $user = getpwuid($uid);
+                $user = defined($user) ? $user : $uid;
+                push(@results, "user:$user:" . getfacl_internal_getperms(\%{$acl{'user'}{$uid}}));
+            }
+        }
+        if (defined $acl{'gperm'}) {
+            push(@results, "group::" . getfacl_internal_getperms(\%{$acl{'gperm'}}));
+        }
+        if (defined $acl{'group'}) {
+            foreach my $gid (keys %{$acl{'group'}}) {
+                my $group = getpwuid($gid);
+                $group = defined($group) ? $group : $gid;
+                push(@results, "group:$group:" . getfacl_internal_getperms(\%{$acl{'group'}{$gid}}));
+            }
+        }
+        if (defined $acl{'mask'}) {
+            push(@results, "mask::" . getfacl_internal_getperms(\%{$acl{'mask'}}));
+        }
+        if (defined $acl{'other'}) {
+            push(@results, "other::" . getfacl_internal_getperms(\%{$acl{'other'}}));
+        }
+    }
+    if (defined $default_acl) {
+        my %acl = %{$default_acl};
+        if (defined $acl{'uperm'}) {
+            push(@results, "default:user::" . getfacl_internal_getperms(\%{$acl{'uperm'}}));
+        }
+        if (defined $acl{'gperm'}) {
+            push(@results, "default:group::" . getfacl_internal_getperms(\%{$acl{'gperm'}}));
+        }
+        if (defined $acl{'mask'}) {
+            push(@results, "default:mask::" . getfacl_internal_getperms(\%{$acl{'mask'}}));
+        }
+        if (defined $acl{'other'}) {
+            push(@results, "default:other::" . getfacl_internal_getperms(\%{$acl{'other'}}));
+        }
+    }
+    return join(",", @results);
+}
+
+sub getfacl_internal_getperms {
+    my ($perms) = @_;
+    my %perms = %{$perms};
+    return ($perms{'r'} ? 'r' : '-') . ($perms{'w'} ? 'w' : '-') . ($perms{'x'} ? 'x' : '-');
+}
+
+sub getfacl_external {
+    my ($file) = @_;
+    my $cmd = join(" ", ("getfacl", "-PcE", escapeshellarg("./$file"), "2>/dev/null"));
+    my $acl = `$cmd`; $acl =~ s/\n+$//; $acl =~ s/\n/,/g;
+    return $acl;
+}
+
+sub setfacl_internal {
+    my ($acl, $file) = @_;
+    if (-l $file) {
+        return 1;
+    }
+    my @acl;
+    foreach my $line (split(",", $acl)) {
+        my @parts = split(":", $line);
+        my $index;
+        my $field;
+        my $id;
+        my $perms;
+
+        if ($#parts == 2) {
+            ($field, $id, $perms) = @parts;
+            $index = 0;
+        } else {
+            ($_, $field, $id, $perms) = @parts;
+            $index = 1;
+        }
+
+        if ($id eq '') {
+            if ($field eq 'user') {
+                $field = 'uperm';
+            } elsif ($field eq 'group') {
+                $field = 'gperm';
+            }
+            $acl[$index]{$field}{'r'} = substr($perms, 0, 1) ne '-' ? 1 : 0;
+            $acl[$index]{$field}{'w'} = substr($perms, 1, 1) ne '-' ? 1 : 0;
+            $acl[$index]{$field}{'x'} = substr($perms, 2, 1) ne '-' ? 1 : 0;
+        } else {
+            if ($id =~ m/^\D/) {
+                $id = (getpwnam($id))[2];
+            }
+            $acl[$index]{$field}{$id}{'r'} = substr($perms, 0, 1) ne '-' ? 1 : 0;
+            $acl[$index]{$field}{$id}{'w'} = substr($perms, 1, 1) ne '-' ? 1 : 0;
+            $acl[$index]{$field}{$id}{'x'} = substr($perms, 2, 1) ne '-' ? 1 : 0;
+        }
+    }
+    return Linux::ACL::setfacl($file, @acl);
+}
+
+sub setfacl_external {
+    my ($acl, $file) = @_;
+    my $cmd = join(" ", ("setfacl", "-Pbm", escapeshellarg($acl), escapeshellarg("./$file"), "2>&1"));
+    `$cmd`;
+    return ($? == 0);
 }
 
 # Print the initial comment block, from first to second "# ==",
@@ -624,9 +750,7 @@ sub get_file_metadata {
             my $group = getpwuid($gid);
             push(@rec, $group || "");
         } elsif ($_ eq "acl") {
-            my $cmd = join(" ", ("getfacl", "-PcE", escapeshellarg("./$file"), "2>/dev/null"));
-            my $acl = `$cmd`; $acl =~ s/\n+$//; $acl =~ s/\n/,/g;
-            push(@rec, $acl);
+            push(@rec, &$getfacl($file));
         }
     }
     return @rec;
@@ -901,8 +1025,7 @@ sub apply {
             if ($fields_used{'acl'} && $data{'acl'} ne "") {
                 print "`$File' set acl to $data{'acl'}\n" if $argv{'verbose'};
                 if (!$argv{'dry-run'}) {
-                    my $cmd = join(" ", ("setfacl", "-Pbm", escapeshellarg($data{'acl'}), escapeshellarg("./$file"), "2>&1"));
-                    `$cmd`; $check = ($? == 0);
+                    $check = &$setfacl($data{'acl'}, $file);
                 } else {
                     $check = 1;
                 }
