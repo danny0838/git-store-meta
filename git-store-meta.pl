@@ -950,14 +950,14 @@ sub apply {
         <GIT_STORE_META_FILE>;
 
         while (<GIT_STORE_META_FILE>) {
-            s/^\s+//; s/\s+$//;
-            next if $_ eq "";
+            chomp;
+            next if m/^\s*$/;
 
             # for each line, parse the record
-            my @rec = split("\t");
+            my @rec = split("\t", $_, -1);
             my %data;
             for (my $i=0; $i<=$#cache_fields; $i++) {
-                $data{$cache_fields[$i]} = defined($rec[$i]) ? $rec[$i] : "";
+                $data{$cache_fields[$i]} = $rec[$i];
             }
 
             # check for existence and type
