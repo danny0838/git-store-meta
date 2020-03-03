@@ -326,9 +326,12 @@ if ($action eq "store") {
     open(GIT_STORE_META_FILE, "<", $git_store_meta_file)
         or die "error: failed to access `$git_store_meta_file': $!\n";
     open(TEMP_FILE, ">", $temp_file) or die;
-    my $count = 0;
+
+    # discard first 2 lines (header)
+    <GIT_STORE_META_FILE>;
+    <GIT_STORE_META_FILE>;
+
     while (<GIT_STORE_META_FILE>) {
-        next if ++$count <= 2;  # discard first 2 lines
         print TEMP_FILE;
     }
     close(TEMP_FILE);
@@ -940,10 +943,13 @@ sub apply {
     # v1.0.0 ~ v2.1.* share same apply procedure
     # (files with a bad file name recorded in 1.0.* will be skipped)
     if (1.0.0 <= $cache_version && $cache_version < 2.2.0) {
-        my $count = 0;
         open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
+
+        # skip first 2 lines (header)
+        <GIT_STORE_META_FILE>;
+        <GIT_STORE_META_FILE>;
+
         while (<GIT_STORE_META_FILE>) {
-            next if ++$count <= 2;  # skip first 2 lines (header)
             s/^\s+//; s/\s+$//;
             next if $_ eq "";
 
