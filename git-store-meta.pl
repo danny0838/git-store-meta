@@ -600,26 +600,27 @@ sub install_hooks {
     my $mask = umask; if (!defined($mask)) { $mask = 0022; }
     my $mode = 0777 & ~$mask;
     my $t;
+    my $s = escapeshellarg($GIT_STORE_META_APP . ".pl");
     my $f = defined($argv{'target'}) ? " -t " . escapeshellarg($argv{'target'}) : "";
     my $f2 = escapeshellarg(defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME);
 
     $t = "$gitdir/hooks/pre-commit";
     open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
-    printf FILE <<'EOF', $f2, $f, $f, $f2;
+    printf FILE <<'EOF', $s, $f, $f2;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
-script=$(dirname "$0")/git-store-meta.pl
-[ ! -x "$script" ] && script=git-store-meta.pl
+script=$(dirname "$0")/%1$s
+[ ! -x "$script" ] && script=%1$s
 
 # update (or store as fallback) the cache file if it exists
-if [ -f %s ]; then
-    "$script" --update%s ||
-    "$script" --store%s ||
+if [ -f %3$s ]; then
+    "$script" --update%2$s ||
+    "$script" --store%2$s ||
     exit 1
 
     # remember to add the updated cache file
-    git add %s
+    git add %3$s
 fi
 EOF
     close(FILE);
@@ -628,12 +629,12 @@ EOF
 
     $t = "$gitdir/hooks/post-checkout";
     open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
-    printf FILE <<'EOF', $f;
+    printf FILE <<'EOF', $s, $f;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
-script=$(dirname "$0")/git-store-meta.pl
-[ ! -x "$script" ] && script=git-store-meta.pl
+script=$(dirname "$0")/%1$s
+[ ! -x "$script" ] && script=%1$s
 
 sha_old=$1
 sha_new=$2
@@ -641,7 +642,7 @@ change_br=$3
 
 # apply metadata only when HEAD is changed
 if [ ${sha_new} != ${sha_old} ]; then
-    "$script" --apply%s
+    "$script" --apply%2$s
 fi
 EOF
     close(FILE);
@@ -650,18 +651,18 @@ EOF
 
     $t = "$gitdir/hooks/post-merge";
     open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
-    printf FILE <<'EOF', $f;
+    printf FILE <<'EOF', $s, $f;
 #!/bin/sh
 # when running the hook, cwd is the top level of working tree
 
-script=$(dirname "$0")/git-store-meta.pl
-[ ! -x "$script" ] && script=git-store-meta.pl
+script=$(dirname "$0")/%1$s
+[ ! -x "$script" ] && script=%1$s
 
 is_squash=$1
 
 # apply metadata after a successful non-squash merge
 if [ $is_squash -eq 0 ]; then
-    "$script" --apply%s
+    "$script" --apply%2$s
 fi
 EOF
     close(FILE);
