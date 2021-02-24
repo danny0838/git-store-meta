@@ -473,7 +473,7 @@ sub getfacl_internal {
         }
         if (defined $acl{'group'}) {
             foreach my $gid (keys %{$acl{'group'}}) {
-                my $group = getpwuid($gid);
+                my $group = getgrgid($gid);
                 $group = defined($group) ? $group : $gid;
                 push(@results, "group:$group:" . getfacl_internal_getperms(\%{$acl{'group'}{$gid}}));
             }
@@ -758,7 +758,7 @@ sub get_file_metadata {
             my $user = getpwuid($uid);
             push(@rec, $user || "");
         } elsif ($_ eq "group") {
-            my $group = getpwuid($gid);
+            my $group = getgrgid($gid);
             push(@rec, $group || "");
         } elsif ($_ eq "acl") {
             push(@rec, &$getfacl($file));
