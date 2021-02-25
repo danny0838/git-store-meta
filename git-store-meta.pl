@@ -46,7 +46,7 @@
 #   gid     group ID (if group is also set, prefer group and fallback to gid)
 #   acl     access control lists for POSIX setfacl/getfacl
 #
-# git-store-meta 2.1.2
+# git-store-meta 2.2.0
 # Copyright (c) 2015-2020, Danny Lin
 # Released under MIT License
 # Project home: https://github.com/danny0838/git-store-meta
@@ -55,7 +55,7 @@
 use utf8;
 use strict;
 
-use version; our $VERSION = version->declare("v2.1.2");
+use version; our $VERSION = version->declare("v2.2.0");
 use Getopt::Long;
 Getopt::Long::Configure qw(gnu_getopt);
 use File::Basename;
@@ -197,7 +197,7 @@ if ($action eq "store") {
     if ($cache_app ne $GIT_STORE_META_APP) {
         die "error: `$git_store_meta_file' is using an unknown schema: $cache_app $cache_version\nFix it or run --store to create new.\n";
     }
-    if (!(2.1.0 <= $cache_version && $cache_version < 2.2.0)) {
+    if (!(2.2.0 <= $cache_version && $cache_version < 2.3.0)) {
         die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
     }
 } elsif ($action eq "apply") {
@@ -941,9 +941,10 @@ sub apply {
     my @fields = @{$argv{'fields'}};
     my %fields_used = map { $_ => 1 } @fields;
 
-    # v1.0.0 ~ v2.1.* share same apply procedure
+    # v1.0.0 ~ v2.2.* share same apply procedure
     # (files with a bad file name recorded in 1.0.* will be skipped)
-    if (1.0.0 <= $cache_version && $cache_version < 2.2.0) {
+    # (files with a bad group name recorded in < 2.2.0 will be used)
+    if (1.0.0 <= $cache_version && $cache_version < 2.3.0) {
         open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
 
         # skip first 2 lines (header)
