@@ -32,6 +32,11 @@
 #   --force            Force an apply even if the working tree is not clean. Or
 #                      install hooks and overwrite existing ones.
 #                      (available for: --apply, --install)
+#   --lazy             Check for current metadata and apply only when changed
+#                      for every file. This may improve performance for an
+#                      environment that reading is faster than writing and only
+#                      few files have changed metadata.
+#                      (available for: --apply)
 #   -t|--target FILE   Specify another filename to store metadata. Defaults to
 #                      ".git_store_meta" in the root of the working tree.
 #                      (available for: --store, --update, --apply, --install)
@@ -117,6 +122,7 @@ my %argv = (
     "force"      => 0,
     "dry-run"    => 0,
     "verbose"    => 0,
+    "lazy"       => 0,
 );
 GetOptions(
     "store|s"      => \$argv{'store'},
@@ -131,6 +137,7 @@ GetOptions(
     "force"        => \$argv{'force'},
     "dry-run|n"    => \$argv{'dry-run'},
     "verbose|v"    => \$argv{'verbose'},
+    "lazy"         => \$argv{'lazy'},
     "target|t=s"   => \$argv{'target'},
 ) or die;
 
@@ -939,6 +946,23 @@ sub apply {
     my @fields = @{$argv{'fields'}};
     my %fields_used = map { $_ => 1 } @fields;
 
+    my @fields0;
+    my %fields0_index;
+    if ($argv{'lazy'}) {
+        my %fields0;
+        foreach my $k (keys %fields_used) {
+            next if $k eq 'file';
+            next if $k eq 'type';
+            $k = 'uid' if $k eq 'user';
+            $k = 'gid' if $k eq 'group';
+            $fields0{$k} = 1;
+        }
+        @fields0 = keys %fields0;
+        while (my ($i, $v) = each @fields0) {
+            $fields0_index{$v} = $i;
+        }
+    }
+
     # v1.0.0 ~ v2.3.* share same apply procedure
     # (files with a bad file name recorded in 1.0.* will be skipped)
     # (files with a bad group name recorded in < 2.2.0 will be used)
@@ -992,6 +1016,11 @@ sub apply {
             }
 
             # apply metadata
+            my @data0;
+            if ($argv{'lazy'}) {
+                @data0 = get_file_metadata($file, \@fields0);
+            }
+
             my $check = 0;
             if (($fields_used{'user'} && $data{'user'} ne "") || 
                     ($fields_used{'uid'} && $data{'uid'} ne "") || 
@@ -1022,25 +1051,39 @@ sub apply {
                 $group = defined($gid) ? $group : "-";
 
                 print "`$File' set user/group to $user/$group\n" if $argv{'verbose'};
-                if (!$argv{'dry-run'}) {
-                    $check = (defined($uid) || defined($gid)) ? &$chown($uid, $gid, $file) : 1;
-                } else {
+                if ($argv{'dry-run'}) {
                     $check = 1;
+                } elsif (!defined($uid) && !defined($gid)) {
+                    $check = 1;
+                } elsif ($argv{'lazy'} &&
+                        (!$fields0_index{'uid'} || $data0[$fields0_index{'uid'}] eq $uid) &&
+                        (!$fields0_index{'gid'} || $data0[$fields0_index{'gid'}] eq $gid)) {
+                    $check = 1;
+                } else {
+                    $check = &$chown($uid, $gid, $file);
                 }
                 warn "warn: `$File' cannot set user/group to $user/$group\n" if !$check;
             }
             if ($fields_used{'mode'} && $data{'mode'} ne "" && ! -l $file) {
                 my $mode = oct($data{'mode'}) & 07777;
                 print "`$File' set mode to $data{'mode'}\n" if $argv{'verbose'};
-                $check = !$argv{'dry-run'} ? chmod($mode, $file) : 1;
+                if ($argv{'dry-run'}) {
+                    $check = 1;
+                } elsif ($argv{'lazy'} && $data0[$fields0_index{'mode'}] eq $data{'mode'}) {
+                    $check = 1;
+                } else {
+                    $check = chmod($mode, $file);
+                }
                 warn "warn: `$File' cannot set mode to $data{'mode'}\n" if !$check;
             }
             if ($fields_used{'acl'} && $data{'acl'} ne "") {
                 print "`$File' set acl to $data{'acl'}\n" if $argv{'verbose'};
-                if (!$argv{'dry-run'}) {
-                    $check = &$setfacl($data{'acl'}, $file);
-                } else {
+                if ($argv{'dry-run'}) {
                     $check = 1;
+                } elsif ($argv{'lazy'} && $data0[$fields0_index{'acl'}] eq $data{'acl'}) {
+                    $check = 1;
+                } else {
+                    $check = &$setfacl($data{'acl'}, $file);
                 }
                 warn "warn: `$File' cannot set acl to $data{'acl'}\n" if !$check;
             }
@@ -1051,10 +1094,14 @@ sub apply {
                 my $atime_ = $atime || '-';
                 my $mtime_ = $mtime || '-';
                 print "`$File' set atime/mtime to $atime_/$mtime_\n" if $argv{'verbose'};
-                if (!$argv{'dry-run'}) {
-                    $check = &$touch($atime, $mtime, $file);
-                } else {
+                if ($argv{'dry-run'}) {
                     $check = 1;
+                } elsif ($argv{'lazy'} &&
+                        (!$fields0_index{'mtime'} || $data0[$fields0_index{'mtime'}] eq $data{'mtime'}) &&
+                        (!$fields0_index{'atime'} || $data0[$fields0_index{'atime'}] eq $data{'atime'})) {
+                    $check = 1;
+                } else {
+                    $check = &$touch($atime, $mtime, $file);
                 }
                 warn "warn: `$File' cannot set atime/mtime to $atime_/$mtime_\n" if !$check;
             }
