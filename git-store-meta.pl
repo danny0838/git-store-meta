@@ -807,7 +807,7 @@ sub store {
     # output sorted entries
     print $git_store_meta_header;
     print join("\t", map {"<" . $_ . ">"} @fields) . "\n";
-    open(CMD, "LC_COLLATE=C sort <".escapeshellarg($temp_file)." |") or die;
+    open(CMD, "LC_ALL=C sort <".escapeshellarg($temp_file)." |") or die;
     while (<CMD>) { print; }
     close(CMD);
 
@@ -888,7 +888,7 @@ sub update {
     my $cur_file = "";
     my $cur_stat = "";
     my $last_file = "";
-    open(CMD, "LC_COLLATE=C sort <".escapeshellarg($temp_file)." |") or die;
+    open(CMD, "LC_ALL=C sort <".escapeshellarg($temp_file)." |") or die;
     # Since sorted, same paths are grouped together, with the changed entries
     # sorted prior.
     # We print the first seen entry and skip subsequent entries with a same
