@@ -769,7 +769,6 @@ sub get_file_metadata {
 
 sub store {
     my @fields = @{$argv{'fields'}};
-    my %fields_used = map { $_ => 1 } @fields;
 
     # read the file list and write retrieved metadata to a temp file
     open(TEMP_FILE, ">", $temp_file) or die;
@@ -817,7 +816,6 @@ sub store {
 
 sub update {
     my @fields = @{$argv{'fields'}};
-    my %fields_used = map { $_ => 1 } @fields;
 
     # append new entries to the temp file
     open(TEMP_FILE, ">>", $temp_file) or die;
