@@ -1058,8 +1058,8 @@ sub apply {
                 } elsif (!defined($uid) && !defined($gid)) {
                     $check = 1;
                 } elsif ($argv{'lazy'} &&
-                        (!$fields0_index{'uid'} || $data0[$fields0_index{'uid'}] eq $uid) &&
-                        (!$fields0_index{'gid'} || $data0[$fields0_index{'gid'}] eq $gid)) {
+                        (!defined($fields0_index{'uid'}) || $data0[$fields0_index{'uid'}] eq $uid) &&
+                        (!defined($fields0_index{'gid'}) || $data0[$fields0_index{'gid'}] eq $gid)) {
                     $check = 1;
                 } else {
                     $check = &$chown($uid, $gid, $file);
@@ -1099,8 +1099,8 @@ sub apply {
                 if ($argv{'dry-run'}) {
                     $check = 1;
                 } elsif ($argv{'lazy'} &&
-                        (!$fields0_index{'mtime'} || $data0[$fields0_index{'mtime'}] eq $data{'mtime'}) &&
-                        (!$fields0_index{'atime'} || $data0[$fields0_index{'atime'}] eq $data{'atime'})) {
+                        (!defined($fields0_index{'mtime'}) || $data0[$fields0_index{'mtime'}] eq $data{'mtime'}) &&
+                        (!defined($fields0_index{'atime'}) || $data0[$fields0_index{'atime'}] eq $data{'atime'})) {
                     $check = 1;
                 } else {
                     $check = &$touch($atime, $mtime, $file);
