@@ -606,6 +606,7 @@ sub install_hooks {
     }
 
     # Install the hooks
+    # CWD of a hook is the top level of working tree.
     my $mask = umask; if (!defined($mask)) { $mask = 0022; }
     my $mode = 0777 & ~$mask;
     my $t;
@@ -617,20 +618,16 @@ sub install_hooks {
     open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
     printf FILE <<'EOF', $s, $f, $f2;
 #!/bin/sh
-# when running the hook, cwd is the top level of working tree
+git_store_meta() (
+    script=$(dirname "$0")/%1$s; [ ! -x "$script" ] && script=%1$s
 
-script=$(dirname "$0")/%1$s
-[ ! -x "$script" ] && script=%1$s
+    # update (or store as fallback) only when the cache file exists
+    [ ! -f %3$s ] && return
 
-# update (or store as fallback) the cache file if it exists
-if [ -f %3$s ]; then
-    "$script" --update%2$s ||
-    "$script" --store%2$s ||
-    exit 1
-
-    # remember to add the updated cache file
+    "$script" --update%2$s || "$script" --store%2$s || return 1
     git add %3$s
-fi
+)
+git_store_meta "$@" || exit 1
 EOF
     close(FILE);
     chmod($mode, $t) == 1 or die "error: failed to set permissions on `$t': $!\n";
@@ -640,19 +637,16 @@ EOF
     open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
     printf FILE <<'EOF', $s, $f;
 #!/bin/sh
-# when running the hook, cwd is the top level of working tree
+git_store_meta() (
+    script=$(dirname "$0")/%1$s; [ ! -x "$script" ] && script=%1$s
+    sha_old=$1; sha_new=$2; change_br=$3
 
-script=$(dirname "$0")/%1$s
-[ ! -x "$script" ] && script=%1$s
+    # apply metadata only when HEAD is changed
+    [ ${sha_new} == ${sha_old} ] && return
 
-sha_old=$1
-sha_new=$2
-change_br=$3
-
-# apply metadata only when HEAD is changed
-if [ ${sha_new} != ${sha_old} ]; then
     "$script" --apply%2$s
-fi
+)
+git_store_meta "$@" || exit 1
 EOF
     close(FILE);
     chmod($mode, $t) == 1 or die "error: failed to set permissions on `$t': $!\n";
@@ -662,17 +656,16 @@ EOF
     open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
     printf FILE <<'EOF', $s, $f;
 #!/bin/sh
-# when running the hook, cwd is the top level of working tree
+git_store_meta() (
+    script=$(dirname "$0")/%1$s; [ ! -x "$script" ] && script=%1$s
+    is_squash=$1
 
-script=$(dirname "$0")/%1$s
-[ ! -x "$script" ] && script=%1$s
+    # apply metadata only after a successful non-squash merge
+    [ $is_squash -ne 0 ] && return
 
-is_squash=$1
-
-# apply metadata after a successful non-squash merge
-if [ $is_squash -eq 0 ]; then
     "$script" --apply%2$s
-fi
+)
+git_store_meta "$@" || exit 1
 EOF
     close(FILE);
     chmod($mode, $t) == 1 or die "error: failed to set permissions on `$t': $!\n";
