@@ -621,6 +621,39 @@ sub install_hooks {
 git_store_meta() (
     script=$(dirname "$0")/%1$s; [ ! -x "$script" ] && script=%1$s
 
+    # skip if a merge, revert, etc. is in progress
+    # ref: https://github.com/git/git/blob/master/contrib/completion/git-prompt.sh
+    r=""
+    if [ -d "$(git rev-parse --git-path rebase-merge)" ]; then
+        r="rebase"
+    elif [ -d "$(git rev-parse --git-path rebase-apply)" ]; then
+        if [ -d "$(git rev-parse --git-path rebase-apply/rebasing)" ]; then
+            r="rebase"
+        elif [ -d "$(git rev-parse --git-path rebase-apply/applying)" ]; then
+            r="am"
+        else
+            r="am/rebase"
+        fi
+    elif [ -f "$(git rev-parse --git-path MERGE_HEAD)" ]; then
+        r="merge"
+    elif [ -f "$(git rev-parse --git-path SQUASH_MSG)" ]; then
+        r="squashing merge"
+    elif [ -f "$(git rev-parse --git-path REVERT_HEAD)" ]; then
+        r="revert"
+    elif [ -f "$(git rev-parse --git-path CHERRY_PICK_HEAD)" ]; then
+        r="cherry-pick"
+    elif [ -d "$(git rev-parse --git-path sequencer)" ]; then
+        f=$(git rev-parse --git-path sequencer/todo)
+        [ -r "$f" ] && IFS=$'\r\n' read todo <"$f"
+        case "$todo" in
+        p[\ \	]*|pick[\ \	]*) r="cherry-pick";;
+        revert[\ \	]*) r="revert";;
+        esac
+    elif [ -f "$(git rev-parse --git-path BISECT_LOG)" ]; then
+        r="bisect"
+    fi
+    [ -n "$r" ] && echo "skipped updating metadata for a commit during a $r..." && return
+
     # update (or store as fallback) only when the cache file exists
     [ ! -f %3$s ] && return
 
