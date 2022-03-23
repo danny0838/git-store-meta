@@ -652,6 +652,7 @@ change_br=$3
 # apply metadata only when HEAD is changed
 if [ ${sha_new} != ${sha_old} ]; then
     "$script" --apply%2$s
+    git update-index --refresh
 fi
 EOF
     close(FILE);
@@ -672,6 +673,7 @@ is_squash=$1
 # apply metadata after a successful non-squash merge
 if [ $is_squash -eq 0 ]; then
     "$script" --apply%2$s
+    git update-index --refresh
 fi
 EOF
     close(FILE);
