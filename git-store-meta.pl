@@ -284,8 +284,13 @@ fix_configs: {
         }
     }
 
+    my $version = substr($VERSION, 1);
     $configs = join(' ', @configs);
-    $git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, substr($VERSION, 1), $configs) . "\n";
+    if ($configs) {
+        $git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, $version, $configs) . "\n";
+    } else {
+        $git_store_meta_header = join("\t", $GIT_STORE_META_PREFIX, $GIT_STORE_META_APP, $version) . "\n";
+    }
 }
 
 prepare_subroutines: {
