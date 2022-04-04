@@ -152,4 +152,4 @@ Caveats:
   explicitly to get it work. For example, to apply metadata for files checked
   out from a bare repo `/path/to/foo` to current directory `/path/to/bar`:
 
-      GIT_DIR=../foo GIT_WORK_TREE=. ../foo/hooks/git-store-meta.pl --apply
+      GIT_DIR=../foo GIT_WORK_TREE=. git-store-meta.pl --apply
