@@ -1026,14 +1026,19 @@ sub apply {
                 next;
             }
             my $type = $data{'type'};
-            # a symbolic link could be checked out as a plain file, simply see them as equal
-            if ($type eq "f" || $type eq "l" ) {
+            if ($type eq "l") {
+                # a symbolic link could be checked out as a plain file, simply see them as equal
                 if (! -f $file && ! -l $file) {
+                    warn "warn: `$File' is not a symlink (or plain file surrogate), skip applying metadata\n";
+                    next;
+                }
+            } elsif ($type eq "f") {
+                if (! -f $file || -l $file) {
                     warn "warn: `$File' is not a file, skip applying metadata\n";
                     next;
                 }
             } elsif ($type eq "d") {
-                if (! -d $file) {
+                if (! -d $file || -l $file) {
                     warn "warn: `$File' is not a directory, skip applying metadata\n";
                     next;
                 }
