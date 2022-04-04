@@ -788,7 +788,7 @@ sub get_file_metadata {
             push(@rec, timestamp_to_gmtime($atime));
         } elsif ($_ eq "mode") {
             $mode = sprintf("%04o", $mode & 07777);
-            $mode = "0664" if $type eq "l";  # symlinks do not apply mode, but use 0664 if checked out as a plain file
+            $mode = "" if $type eq "l";  # do not apply mode for symlinks
             push(@rec, $mode);
         } elsif ($_ eq "uid") {
             push(@rec, $uid);
