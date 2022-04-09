@@ -1148,4 +1148,7 @@ sub apply {
     } else {
         die "error: `$git_store_meta_file' is using an unsupported version: $cache_version\n";
     }
+
+    # update cached stat information for checked out files
+    `$GIT update-index -q --ignore-submodules --ignore-missing --refresh`;
 }
