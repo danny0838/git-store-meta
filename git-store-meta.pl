@@ -52,7 +52,7 @@
 #   gid     group ID (if group is also set, prefer group and fallback to gid)
 #   acl     access control lists for POSIX setfacl/getfacl
 #
-# git-store-meta 2.3.3
+# git-store-meta 2.3.4
 # Copyright (c) 2015-2022, Danny Lin
 # Released under MIT License
 # Project home: https://github.com/danny0838/git-store-meta
@@ -61,7 +61,7 @@
 use utf8;
 use strict;
 
-use version; our $VERSION = version->declare("v2.3.3");
+use version; our $VERSION = version->declare("v2.3.4");
 use Getopt::Long;
 Getopt::Long::Configure qw(gnu_getopt);
 use File::Basename;
