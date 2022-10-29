@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 # =============================================================================
 # Usage: git-store-meta.pl ACTION [OPTION...]
 # Store, update, or apply metadata for files revisioned by Git.
@@ -60,6 +60,7 @@
 
 use utf8;
 use strict;
+use warnings;
 
 use version; our $VERSION = version->declare("v2.3.4");
 use Getopt::Long;
