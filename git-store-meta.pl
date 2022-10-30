@@ -755,9 +755,12 @@ sub get_cache_header_info {
 
 sub has_directory_entry {
     open(GIT_STORE_META_FILE, "<:crlf", $git_store_meta_file) or die;
-    my $count = 0;
+
+    # skip first 2 lines (header)
+    <GIT_STORE_META_FILE>;
+    <GIT_STORE_META_FILE>;
+
     while (<GIT_STORE_META_FILE>) {
-        next if ++$count <= 2;  # skip first 2 lines
         s/^\s+//; s/\s+$//;
         next if $_ eq "";
         return 1 if (split "\t")[1] eq "d";
