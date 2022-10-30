@@ -338,7 +338,7 @@ if ($action eq "store") {
 } elsif ($action eq "update") {
     # copy the cache file to the temp file
     # to prevent a conflict in further operation
-    open(GIT_STORE_META_FILE, "<", $git_store_meta_file)
+    open(GIT_STORE_META_FILE, "<:crlf", $git_store_meta_file)
         or die "error: failed to access `$git_store_meta_file': $!\n";
     open(TEMP_FILE, ">", $temp_file) or die;
 
@@ -584,7 +584,7 @@ sub setfacl_external {
 # with "# " removed
 sub usage {
     my $start = 0;
-    open(GIT_STORE_META, "<", $script)
+    open(GIT_STORE_META, "<:crlf", $script)
         or die "error: failed to access `$script': $!\n";
     while (<GIT_STORE_META>) {
         if (m/^# ={2,}/) {
@@ -715,7 +715,7 @@ sub get_cache_header_info {
     -e $git_store_meta_file or return;
     $cache_file_exist = 1;
 
-    -f $git_store_meta_file and open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or return;
+    -f $git_store_meta_file and open(GIT_STORE_META_FILE, "<:crlf", $git_store_meta_file) or return;
     $cache_file_accessible = 1;
 
     # first line: retrieve the header
@@ -754,7 +754,7 @@ sub get_cache_header_info {
 }
 
 sub has_directory_entry {
-    open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
+    open(GIT_STORE_META_FILE, "<:crlf", $git_store_meta_file) or die;
     my $count = 0;
     while (<GIT_STORE_META_FILE>) {
         next if ++$count <= 2;  # skip first 2 lines
@@ -1001,7 +1001,7 @@ sub apply {
     # (files with a bad file name recorded in 1.0.* will be skipped)
     # (files with a bad group name recorded in < 2.2.0 will be used)
     if (1.0.0 <= $cache_version && $cache_version < 2.4.0) {
-        open(GIT_STORE_META_FILE, "<", $git_store_meta_file) or die;
+        open(GIT_STORE_META_FILE, "<:crlf", $git_store_meta_file) or die;
 
         # skip first 2 lines (header)
         <GIT_STORE_META_FILE>;
