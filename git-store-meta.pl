@@ -681,7 +681,7 @@ git_store_meta() (
     sha_old=$1; sha_new=$2; change_br=$3
 
     # apply metadata only when HEAD is changed
-    [ ${sha_new} == ${sha_old} ] && return
+    [ "${sha_new}" = "${sha_old}" ] && return
 
     "$script" --apply%2$s
 )
