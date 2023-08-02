@@ -13,9 +13,10 @@
 #   --version          Show current version and exit.
 #
 # Available OPTIONs are:
-#   -f|--fields FIELDs Fields to handle (see below). If omitted, fields in the
-#                      current metadata store file are picked when possible;
-#                      otherwise, "mtime" is picked as the default.
+#   -f|--fields FIELDs Fields to handle (see below) separated by comma. If
+#                      omitted, fields in the current metadata store file are
+#                      picked when possible; otherwise, "mtime" is picked as
+#                      the default.
 #                      (available for: --store, --apply)
 #   -d|--directory     Also store, update, or apply for directories.
 #                      (available for: --store, --apply)
@@ -41,6 +42,8 @@
 #   -t|--target FILE   Specify another filename to store metadata. Defaults to
 #                      ".git_store_meta" in the root of the working tree.
 #                      (available for: --store, --update, --apply, --install)
+#   -z|--timezone TZ   Specify the time zone to consider for dates in the form
+#                      of ±hh (for example -5, +2, -10, etc)
 #
 # FIELDs is a comma-separated string consisting of the following values:
 #   mtime   last modified time
@@ -126,6 +129,7 @@ my %argv = (
     "force"      => 0,
     "dry-run"    => 0,
     "verbose"    => 0,
+    "timezone"   => undef,
 );
 GetOptions(
     "store|s"      => \$argv{'store'},
@@ -142,6 +146,7 @@ GetOptions(
     "dry-run|n"    => \$argv{'dry-run'},
     "verbose|v"    => \$argv{'verbose'},
     "target|t=s"   => \$argv{'target'},
+    "timezone|z=s" => \$argv{'timezone'},
 ) or die;
 
 # determine action
@@ -384,14 +389,50 @@ sub get_file_type {
     return undef;
 }
 
+# Returns the timestamp set according to the --timezone parameter. If timezone
+# is not defined then it returns the original time.
+sub time_compensator {
+    my (@timestamp) = @_;
+    if (defined($argv{'timezone'})) {
+        my $timezone = int($argv{'timezone'});
+        if($timezone >= -12 && $timezone <= 14) {
+            my @lt = localtime(12*60*60);
+            my @gt = gmtime(12*60*60);
+            my $local_tz = $lt[2] - $gt[2];
+            my $range_time = 0;
+            # For cases where one time zone is negative and another is positive
+            for (my $i=($local_tz < $timezone ? $local_tz : $timezone); $i < ($local_tz > $timezone ? $local_tz : $timezone); $i++) {
+                $range_time++;
+            }
+            my $time_diff = abs(abs($timezone) - abs($local_tz));
+            if ($time_diff != $range_time) {
+                $time_diff = $range_time;
+            }
+            if ($timezone > $local_tz) {
+                $timestamp[2] = $timestamp[2] - $time_diff;
+            }
+            elsif ($timezone < $local_tz) {
+                $timestamp[2] = $timestamp[2] + $time_diff;
+            }
+            return @timestamp;
+        }
+        else {
+            die "error: incorrect timezone\n";
+        }
+    }
+    else {
+        return @timestamp;
+    }
+}
+
 sub timestamp_to_gmtime {
     my ($timestamp) = @_;
-    my @t = gmtime($timestamp);
+    my @t = time_compensator(gmtime($timestamp));
     return strftime("%Y-%m-%dT%H:%M:%SZ", @t);
 }
 
 sub gmtime_to_timestamp {
-    my ($gmtime) = @_;
+    my ($gmtime) = time_compensator(@_);
     $gmtime =~ m/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/;
     return timegm($6, $5, $4, $3, $2 - 1, $1);
 }
