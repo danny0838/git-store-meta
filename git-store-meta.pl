@@ -52,7 +52,7 @@
 #   gid     group ID (if group is also set, prefer group and fallback to gid)
 #   acl     access control lists for POSIX setfacl/getfacl
 #
-# git-store-meta 2.3.7
+# git-store-meta $VERSION
 # Copyright (c) 2015-2023, Danny Lin
 # Released under MIT License
 # Project home: https://github.com/danny0838/git-store-meta
@@ -584,6 +584,8 @@ sub setfacl_external {
 # with "# " removed
 sub usage {
     my $start = 0;
+    my $version = $VERSION;
+    $version =~ s/^v//;  # remove optional starting 'v'
     open(GIT_STORE_META, "<:crlf", $script)
         or die "error: failed to access `$script': $!\n";
     while (<GIT_STORE_META>) {
@@ -593,6 +595,7 @@ sub usage {
         }
         next if !$start;
         s/^# ?//;
+        s/\$VERSION/$version/; # replace $VERSION with actual version
         print;
     }
     close(GIT_STORE_META);
