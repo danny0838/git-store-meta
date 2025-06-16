@@ -1,5 +1,8 @@
 # git-store-meta
 
+[![GitHub release](https://img.shields.io/github/v/release/danny0838/git-store-meta)](https://github.com/danny0838/git-store-meta/releases)
+![License](https://img.shields.io/github/license/danny0838/git-store-meta)
+
 git-store-meta is a light-weight tool for file metadata storing and applying
 for Git.
 
