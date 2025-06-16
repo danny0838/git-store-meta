@@ -620,9 +620,8 @@ sub install_hooks {
     my $f = defined($argv{'target'}) ? " -t " . escapeshellarg($argv{'target'}) : "";
     my $f2 = escapeshellarg(defined($argv{'target'}) ? $argv{'target'} : $GIT_STORE_META_FILENAME);
 
-    $t = "$gitdir/hooks/pre-commit";
-    open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
-    printf FILE <<'EOF', $s, $f, $f2;
+    my %hooks = (
+        'pre-commit' => <<'EOF'
 #!/bin/sh
 git_store_meta() (
     script=$(dirname "$0")/%1$s; [ ! -x "$script" ] && script=%1$s
@@ -668,13 +667,7 @@ git_store_meta() (
 )
 git_store_meta "$@" || exit 1
 EOF
-    close(FILE);
-    chmod($mode, $t) == 1 or die "error: failed to set permissions on `$t': $!\n";
-    print "created `$t'\n";
-
-    $t = "$gitdir/hooks/post-checkout";
-    open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
-    printf FILE <<'EOF', $s, $f;
+    , 'post-checkout' => <<'EOF'
 #!/bin/sh
 git_store_meta() (
     script=$(dirname "$0")/%1$s; [ ! -x "$script" ] && script=%1$s
@@ -687,13 +680,7 @@ git_store_meta() (
 )
 git_store_meta "$@" || exit 1
 EOF
-    close(FILE);
-    chmod($mode, $t) == 1 or die "error: failed to set permissions on `$t': $!\n";
-    print "created `$t'\n";
-
-    $t = "$gitdir/hooks/post-merge";
-    open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
-    printf FILE <<'EOF', $s, $f;
+    , 'post-merge' => <<'EOF'
 #!/bin/sh
 git_store_meta() (
     script=$(dirname "$0")/%1$s; [ ! -x "$script" ] && script=%1$s
@@ -706,9 +693,24 @@ git_store_meta() (
 )
 git_store_meta "$@" || exit 1
 EOF
-    close(FILE);
-    chmod($mode, $t) == 1 or die "error: failed to set permissions on `$t': $!\n";
-    print "created `$t'\n";
+    );
+
+    my $dry_run_text = "";
+    $dry_run_text = "\t <dry-run>" if $argv{'dry-run'};
+    while (my ($hook, $hook_text) = each %hooks) {
+        $t = "$gitdir/hooks/$hook";
+        print "warning: overwriting hook file '$t'$dry_run_text\n" if -e $t;
+        # replace variables for "script_name", "git_store_file", "git_store_file2" 
+        $hook_text = sprintf($hook_text, $s, $f, $f2);
+        unless ($argv{'dry-run'}) {
+            open(FILE, '>', $t) or die "error: failed to write to `$t': $!\n";
+            printf FILE $hook_text;
+            close(FILE);
+            chmod($mode, $t) == 1 or die "error: failed to set permissions on `$t': $!\n";
+        }
+        print "created `$t'$dry_run_text\n";
+    }
+    return;
 }
 
 sub get_cache_header_info {
