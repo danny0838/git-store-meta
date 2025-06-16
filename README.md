@@ -1,11 +1,9 @@
-git-store-meta
-===============================================================================
+# git-store-meta
 
 git-store-meta is a light-weight tool for file metadata storing and applying
 for Git.
 
-Features:
--------------------------------------------------------------------------------
+## Features
 
 * Light dependency, cross-platform consistent behavior, desirable performance.
 
@@ -24,8 +22,7 @@ Features:
 
 * Can determine whether to store, update, or apply directory metadata.
 
-Dependency:
--------------------------------------------------------------------------------
+## Dependency
 
 - git >= 1.7.2
 - *nix platform with basic shell environment (required by Git)
@@ -34,8 +31,7 @@ Dependency:
 - File::lchown module, or touch/chown -h (optional, for applying metadata to symbolic links)
 - Linux::ACL module, or getfacl/setfacl -P (optional, for manipulating ACL metadata)
 
-Usage:
--------------------------------------------------------------------------------
+## Usage
 
 Copy the `git-store-meta.pl` file to `/path/to/your/repo/.git/hooks/`, add
 executable permission to it, change the working directory to the Git working
@@ -115,7 +111,7 @@ many cases.
 
 ### Install
 
-To automatically store metadata before a commit and restore metadata after a
+To automatically update metadata before a commit and apply metadata after a
 checkout or merge for files, run:
 
     git-store-meta.pl --install
@@ -141,8 +137,7 @@ For more available options and details, run:
 
     git-store-meta.pl --help
 
-Caveats:
--------------------------------------------------------------------------------
+## Caveats
 
 * git-store-meta does not record the time more than seconds precision, as it's
   not supported widely enough and many systems simply ignore it.
