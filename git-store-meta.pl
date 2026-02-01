@@ -102,6 +102,7 @@ my $cache_app;
 my $cache_version;
 my %cache_configs;
 my @cache_fields;
+my $cache_header_error;
 
 my $touch;
 my $chown;
@@ -711,21 +712,21 @@ EOF
     print "created `$t'\n";
 }
 
-sub get_cache_header_info {
-    -e $git_store_meta_file or return;
+sub get_cache_header_info_orig {
+    -e $git_store_meta_file or return "git_store_meta cache file does not exist: $git_store_meta_file";
     $cache_file_exist = 1;
 
-    -f $git_store_meta_file and open(GIT_STORE_META_FILE, "<:crlf", $git_store_meta_file) or return;
+    -f $git_store_meta_file and open(GIT_STORE_META_FILE, "<:crlf", $git_store_meta_file) or return "cannot read git_store_meta file";
     $cache_file_accessible = 1;
 
     # first line: retrieve the header
     my $line = <GIT_STORE_META_FILE>;
-    $line or return;
+    $line or return "empty first line";
     chomp($line);
     my ($prefix, $app, $version, $configs) = split("\t", $line);
-    $prefix eq $GIT_STORE_META_PREFIX or return;
+    $prefix eq $GIT_STORE_META_PREFIX or return "prefix is invalid, expecting: '$GIT_STORE_META_PREFIX' got: '$prefix'";
     $cache_app = $app;
-    eval { $cache_version = version->parse("v" . $version); } or return;
+    eval { $cache_version = version->parse("v" . $version); } or return "cannot parse version: '$version': $@\n";
 
     if (defined($configs)) {
         foreach (split(/\s+/, $configs)) {
@@ -739,18 +740,37 @@ sub get_cache_header_info {
 
     # second line: retrieve the fields
     $line = <GIT_STORE_META_FILE>;
-    $line or return;
+    $line or return "empty second line";
     chomp($line);
     foreach (split("\t", $line)) {
-        m/^<(.*)>$/ and push(@cache_fields, $1) or return;
+        m/^<([a-z]+)>$/ or return "invalid field '$_' in header line: '$line'";
+        grep(/^$1$/, @FIELDS) or return "invalid field name '$_' in header line: '$line'";
+        push(@cache_fields, $1);
     }
 
     # check for existence of "file" and "type" fields
-    grep { $_ eq 'file' } @cache_fields or return;
-    grep { $_ eq 'type' } @cache_fields or return;
+    grep { $_ eq 'file' } @cache_fields or return "missing <file> field in header: $line";
+    grep { $_ eq 'type' } @cache_fields or return "missing <type> field in header: $line";
 
     close(GIT_STORE_META_FILE);
     $cache_header_valid = 1;
+    return; # return undef to indicate no error
+}
+
+# a wrapper around get_cache_header_info_orig that:
+#  1. saves the returned error from get_cache_header_info_orig in $cache_header_error
+#     in case we need it in other place
+#  2. print a warning to STDERR if there is an error and cache_file_exist
+# this should help users identify the exact error in .git_meta_store file
+sub get_cache_header_info {
+    my $header_error = get_cache_header_info_orig();
+    if ( $cache_file_exist and $header_error ) {
+        # print error only if $cache_file_exist
+        print STDERR "warning: error in git_store_meta file: '$git_store_meta_file': $header_error\n" if $header_error;
+    }
+    # save error in global $cache_header_error
+    $cache_header_error = $header_error;
+    return $header_error;
 }
 
 sub has_directory_entry {
